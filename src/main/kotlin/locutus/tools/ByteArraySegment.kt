@@ -1,8 +1,6 @@
 package locutus.tools
 
-import kotlinx.serialization.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.protobuf.ProtoId
 import locutus.TrConstants
 import java.io.*
@@ -135,6 +133,6 @@ class ByteArraySegment(@ProtoId(1) val array: ByteArray,
     }
 }
 
-fun ByteArray.toImmutable(): ByteArraySegment {
+fun ByteArray.asSegment(): ByteArraySegment {
     return ByteArraySegment(this, 0, this.size)
 }
