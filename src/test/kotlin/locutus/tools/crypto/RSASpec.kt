@@ -1,10 +1,9 @@
-package locutus.crypto
+package locutus.tools.crypto
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.ints.shouldBeExactly
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.protobuf.ProtoId
 import locutus.tools.ByteArraySegment

@@ -1,4 +1,4 @@
-package locutus.crypto
+package locutus.tools.crypto
 
 import locutus.tools.ByteArraySegment
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -13,6 +13,9 @@ class AESKey(private val byteArraySegment: ByteArraySegment) {
 
     companion object {
         private const val CIPHER_NAME = "AES/CBC/PKCS7Padding"
+
+        const val KEY_SIZE_BYTES = 16
+        const val RSA_ENCRYPTED_SIZE = 256
 
         var overhead: Int
 
@@ -36,9 +39,10 @@ class AESKey(private val byteArraySegment: ByteArraySegment) {
     }
 
 
-    private val skey: SecretKeySpec = SecretKeySpec(byteArraySegment.array, byteArraySegment.offset, byteArraySegment.length, "AES")
-    fun toBytes(): ByteArray {
-        return skey.encoded
+    private val skey: SecretKeySpec =
+        SecretKeySpec(byteArraySegment.array, byteArraySegment.offset, byteArraySegment.length, "AES")
+    val bytes: ByteArray by lazy {
+        skey.encoded
     }
 
     fun decrypt(toDecrypt: ByteArraySegment): ByteArraySegment {
@@ -66,16 +70,14 @@ class AESKey(private val byteArraySegment: ByteArraySegment) {
             val cipher = Cipher.getInstance(CIPHER_NAME)
             cipher.init(Cipher.ENCRYPT_MODE, skey, IvParameterSpec(iv))
             val ciphertext = cipher.doFinal(toEncrypt.array, toEncrypt.offset, toEncrypt.length)
-            val basb = ByteArraySegment.ByteArraySegmentBuilder()
-            basb.write(iv)
-            basb.write(ciphertext)
-            basb.build()
+            ByteArraySegment(iv + ciphertext)
         } catch (e: Exception) {
             throw RuntimeException(e)
-        } }
+        }
+    }
 
-    fun toImmutableByteArray(): ByteArraySegment {
-        return ByteArraySegment(toBytes())
+    fun asByteArraySegment(): ByteArraySegment {
+        return ByteArraySegment(bytes)
     }
 
 }

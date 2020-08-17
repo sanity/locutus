@@ -1,4 +1,4 @@
-package locutus.crypto
+package locutus.tools.crypto
 
 import java.security.MessageDigest
 

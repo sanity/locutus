@@ -1,6 +1,6 @@
 @file:UseSerializers(RSAPubKeySerializer::class, RSAPrivateKeySerializer::class)
 
-package locutus.crypto
+package locutus.tools.crypto
 
 import kotlinx.serialization.*
 import locutus.tools.ByteArraySegment
@@ -46,7 +46,7 @@ fun RSAPublicKey.verify(signature : RSASignature, data : ByteArray) : Boolean {
     val sig = Signature.getInstance("SHA256withRSA", "BC")
     sig.initVerify(this)
     sig.update(data)
-    return sig.verify(signature.arraySegment.array)
+    return sig.verify(signature.arraySegment.array, signature.arraySegment.offset, signature.arraySegment.length)
 }
 
 @Serializable
@@ -61,7 +61,7 @@ fun RSAPublicKey.encrypt(data : ByteArraySegment) : RSAEncrypted {
 fun RSAPrivateKey.decrypt(encrypted : RSAEncrypted) : ByteArraySegment {
     val cipher = Cipher.getInstance("RSA/None/NoPadding", "BC")
     cipher.init(Cipher.DECRYPT_MODE, this)
-    return ByteArraySegment(cipher.doFinal(encrypted.data.array))
+    return ByteArraySegment(cipher.doFinal(encrypted.data.asArray))
 }
 
 @Serializable
@@ -70,7 +70,7 @@ data class RSAAESEncrypted(val rsaEncryptedAESKey: RSAEncrypted, val rsaEncrypte
 fun RSAPublicKey.encryptWithAes(data : ByteArraySegment) : RSAAESEncrypted {
     val aesKey = AESKey.generate()
     val encryptedData = aesKey.encrypt(data)
-    val encryptedKey = this.encrypt(aesKey.toImmutableByteArray())
+    val encryptedKey = this.encrypt(aesKey.asByteArraySegment())
     return RSAAESEncrypted(encryptedKey, encryptedData)
 }
 

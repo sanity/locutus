@@ -1,6 +1,6 @@
 package locutus
 
-object TrConstants {
+object Constants {
     const val PERSISTENCE_CACHE_SIZE = 25
     const val MAX_UDP_PACKET_SIZE = 1400 // old value was 1450
     const val UDP_CONN_INIT_INTERVAL_SECONDS = 2
