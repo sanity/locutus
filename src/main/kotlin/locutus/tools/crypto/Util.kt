@@ -1,6 +1,5 @@
 package locutus.tools.crypto
 
-import locutus.tools.ByteArraySegment
 import java.security.MessageDigest
 
 object Util {
@@ -14,13 +13,13 @@ object Util {
 
 }
 
-fun Iterable<ByteArraySegment>.merge() : ByteArray {
+fun Iterable<ByteArray>.merge() : ByteArray {
     val sizes = this.map { it.size }
     val ttlSize = sizes.sum()
     val ret = ByteArray(ttlSize)
     var ix = 0
     for (ba in this) {
-        ba.array.copyInto(ret, ix, ba.offset, ba.offset + ba.length)
+        ba.copyInto(ret, ix)
         ix += ba.size
     }
     return ret

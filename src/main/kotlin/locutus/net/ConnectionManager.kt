@@ -7,7 +7,6 @@ import kotlinx.serialization.dump
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
 import locutus.net.messages.Message
-import locutus.tools.ByteArraySegment
 import locutus.tools.crypto.AESKey
 import locutus.tools.crypto.encrypt
 import java.net.InetSocketAddress
@@ -57,10 +56,10 @@ class ConnectionManager(val port: Int, val open: Boolean) {
 
     suspend fun connect(peer: RemotePeer) {
         val outboundKey = AESKey.generate()
-        val encryptedOutboundKey = peer.pubKey.encrypt(outboundKey.asByteArraySegment()).data
+        val encryptedOutboundKey = peer.pubKey.encrypt(outboundKey.bytes)
         val outboundMessage = ProtoBuf.encodeToByteArray(Message.serializer(), Message.OpenConnection(1))
-        val encryptedOutboundMessage = outboundKey.encrypt(ByteArraySegment(outboundMessage))
-        val introMessage = listOf(encryptedOutboundKey, encryptedOutboundMessage).merge() // TODO: Inefficient
+        val encryptedOutboundMessage = outboundKey.encrypt(outboundMessage)
+        val introMessage = listOf(encryptedOutboundKey.bytes, encryptedOutboundMessage).merge()
       //  val existingConnection = connections.computeIfAbsent(peer.address) { Connection(peer, null, null, ConnectionState.Connecting(AESKey.generate())) }
 
     }

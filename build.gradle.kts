@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.4.0"
     kotlin("plugin.serialization") version "1.4.0"
+    id("idea")
     `java-library`
 }
 
@@ -48,3 +49,10 @@ tasks {
     }
 }
 
+
+idea {
+    module {
+        isDownloadJavadoc = true
+        isDownloadSources = true
+    }
+}

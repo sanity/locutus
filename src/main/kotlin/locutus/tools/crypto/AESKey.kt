@@ -1,6 +1,6 @@
 package locutus.tools.crypto
 
-import locutus.tools.ByteArraySegment
+import kotlinx.serialization.Serializable
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.SecureRandom
 import java.security.Security
@@ -9,75 +9,62 @@ import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class AESKey(private val byteArraySegment: ByteArraySegment) {
+@Serializable class AESKey(val bytes: ByteArray) {
 
     companion object {
         private const val CIPHER_NAME = "AES/CBC/PKCS7Padding"
 
+        init {
+            Security.addProvider(BouncyCastleProvider())
+        }
+
         const val KEY_SIZE_BYTES = 16
         const val RSA_ENCRYPTED_SIZE = 256
 
-        var overhead: Int
+        val blockSize: Int = run {
+            Cipher.getInstance(CIPHER_NAME).blockSize
+        }
 
         private val rng = SecureRandom()
 
-        init {
-            Security.addProvider(BouncyCastleProvider())
-            try {
-                overhead = Cipher.getInstance(CIPHER_NAME).blockSize
-            } catch (e: Exception) {
-                throw RuntimeException(e)
-            }
-        }
 
         fun generate(): AESKey {
-            val kgen = KeyGenerator.getInstance("AES");
-            kgen.init(128);
-            val skey = kgen.generateKey();
-            return AESKey(ByteArraySegment(skey.encoded));
+            val kgen = KeyGenerator.getInstance("AES")
+            kgen.init(128)
+            val skey = kgen.generateKey()
+            return AESKey(skey.encoded)
         }
     }
 
 
-    private val skey: SecretKeySpec =
-        SecretKeySpec(byteArraySegment.array, byteArraySegment.offset, byteArraySegment.length, "AES")
-    val bytes: ByteArray by lazy {
-        skey.encoded
-    }
+    private val toSecretKeySpec: SecretKeySpec by lazy { SecretKeySpec(bytes, "AES") }
 
-    fun decrypt(toDecrypt: ByteArraySegment): ByteArraySegment {
+    fun decrypt(toDecrypt: ByteArray): ByteArray {
         return try {
             val cipher = Cipher.getInstance(CIPHER_NAME)
             val ivSpec =
-                IvParameterSpec(toDecrypt.array, toDecrypt.offset, overhead)
-            cipher.init(Cipher.DECRYPT_MODE, skey, ivSpec)
-            ByteArraySegment(
-                cipher.doFinal(
-                    toDecrypt.array,
-                    toDecrypt.offset + overhead,
-                    toDecrypt.length - overhead
-                )
+                IvParameterSpec(toDecrypt, 0, blockSize)
+            cipher.init(Cipher.DECRYPT_MODE, toSecretKeySpec, ivSpec)
+            cipher.doFinal(
+                toDecrypt,
+                blockSize,
+                toDecrypt.size - blockSize
             )
         } catch (e: Exception) {
             throw RuntimeException(e)
         }
     }
 
-    fun encrypt(toEncrypt: ByteArraySegment): ByteArraySegment {
+    fun encrypt(toEncrypt: ByteArray): ByteArray {
         return try {
-            val iv = ByteArray(overhead)
+            val iv = ByteArray(blockSize)
             synchronized(rng) { rng.nextBytes(iv) }
             val cipher = Cipher.getInstance(CIPHER_NAME)
-            cipher.init(Cipher.ENCRYPT_MODE, skey, IvParameterSpec(iv))
-            val ciphertext = cipher.doFinal(toEncrypt.array, toEncrypt.offset, toEncrypt.length)
-            ByteArraySegment(iv + ciphertext)
+            cipher.init(Cipher.ENCRYPT_MODE, toSecretKeySpec, IvParameterSpec(iv))
+            val ciphertext = cipher.doFinal(toEncrypt)
+            listOf(iv, ciphertext).merge()
         } catch (e: Exception) {
             throw RuntimeException(e)
         }
     }
-
-    fun asByteArraySegment(): ByteArraySegment {
-        return ByteArraySegment(bytes)
-    }
-
 }
