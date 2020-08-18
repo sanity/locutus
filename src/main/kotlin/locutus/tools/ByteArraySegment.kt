@@ -31,7 +31,7 @@ import kotlinx.serialization.builtins.ByteArraySerializer
     val asArray : ByteArray get() = array.copyOfRange(offset, offset + length)
 
     override fun get(index: Int): Byte = array[offset + index]
-
+/*
     @Serializer(forClass = ByteArraySegment::class)
     companion object : KSerializer<ByteArraySegment> {
         override val descriptor: SerialDescriptor
@@ -45,7 +45,7 @@ import kotlinx.serialization.builtins.ByteArraySerializer
             return ByteArraySegment(decoder.decode(ByteArraySerializer()))
         }
     }
-
+*/
 
 }
 

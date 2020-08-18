@@ -21,8 +21,8 @@ tasks.withType<Test> {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:0.20.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0-RC")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.0-RC")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.9")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.65.01")

@@ -1,4 +1,4 @@
-@file:UseSerializers(RSAPubKeySerializer::class, RSAPrivateKeySerializer::class)
+//@file:UseSerializers(RSAPubKeySerializer::class, RSAPrivateKeySerializer::class)
 
 package locutus.tools.crypto
 
@@ -78,7 +78,7 @@ fun RSAPrivateKey.decrypt(encrypted : RSAAESEncrypted) : ByteArraySegment {
     val aesKey = AESKey(this.decrypt(encrypted.rsaEncryptedAESKey))
     return aesKey.decrypt(encrypted.rsaEncryptedData)
 }
-
+/*
 object RSAPubKeySerializer : KSerializer<RSAPublicKey> {
     override val descriptor: SerialDescriptor
         = PrimitiveDescriptor("RSAPubKey", PrimitiveKind.STRING)
@@ -107,3 +107,5 @@ object RSAPrivateKeySerializer : KSerializer<RSAPrivateKey> {
     }
 
 }
+
+ */
