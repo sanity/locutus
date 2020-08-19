@@ -4,12 +4,14 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.ints.shouldBeExactly
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.dump
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.protobuf.ProtoNumber
 import java.nio.charset.Charset
 
+@ExperimentalSerializationApi
 @ExperimentalStdlibApi
 class RSASpec : FunSpec({
     test("simple encrypt decrypt") {
@@ -22,7 +24,22 @@ class RSASpec : FunSpec({
 
     test("ByteArray serialize") {
         @Serializable
-        class Foo(@ProtoNumber(1) val bar: ByteArray)
+        data class Foo(@ProtoNumber(1) val bar: ByteArray) {
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (javaClass != other?.javaClass) return false
+
+                other as Foo
+
+                if (!bar.contentEquals(other.bar)) return false
+
+                return true
+            }
+
+            override fun hashCode(): Int {
+                return bar.contentHashCode()
+            }
+        }
 
         val foo = Foo("ABCDEFG".toByteArray(Charset.forName("UTF-8")))
 
