@@ -30,9 +30,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.9")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.65.01")
-
     implementation("com.google.guava:guava:29.0-jre")
-    // implementation("com.sksamuel.avro4k:avro4k-core:0.30.0")
+    implementation("io.github.microutils:kotlin-logging:1.8.3")
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.2.0.502-SNAPSHOT")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.2.0.502-SNAPSHOT")

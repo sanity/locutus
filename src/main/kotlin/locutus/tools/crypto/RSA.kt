@@ -46,37 +46,70 @@ data class RSASignature(val array : ByteArray) {
     }
 }
 
-fun RSAPrivateKey.sign(data : ByteArray) : RSASignature {
+fun RSAPrivateKey.sign(toSign : ByteArray) : RSASignature {
     val sig : Signature = Signature.getInstance("SHA256withRSA", "BC")
     sig.initSign(this)
-    sig.update(data)
+    sig.update(toSign)
     return RSASignature(sig.sign())
 }
 
-fun RSAPublicKey.verify(signature : RSASignature, bytes : ByteArray) : Boolean {
+fun RSAPublicKey.verify(signature : RSASignature, toVerify : ByteArray) : Boolean {
     val sig = Signature.getInstance("SHA256withRSA", "BC")
     sig.initVerify(this)
-    sig.update(bytes)
+    sig.update(toVerify)
     return sig.verify(signature.array)
 }
 
 @Serializable
-data class RSAEncrypted(val bytes : ByteArray)
+data class RSAEncrypted(val ciphertext : ByteArray) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
-fun RSAPublicKey.encrypt(bytes : ByteArray) : RSAEncrypted {
-    val cipher = Cipher.getInstance("RSA/None/NoPadding", "BC")
-    cipher.init(Cipher.ENCRYPT_MODE, this)
-    return RSAEncrypted(cipher.doFinal(bytes))
+        other as RSAEncrypted
+
+        if (!ciphertext.contentEquals(other.ciphertext)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return ciphertext.contentHashCode()
+    }
 }
 
-fun RSAPrivateKey.decrypt(encrypted : RSAEncrypted) : ByteArray {
+fun RSAPublicKey.encrypt(toEncrypt : ByteArray) : RSAEncrypted {
+    val cipher = Cipher.getInstance("RSA/None/NoPadding", "BC")
+    cipher.init(Cipher.ENCRYPT_MODE, this)
+    return RSAEncrypted(cipher.doFinal(toEncrypt))
+}
+
+fun RSAPrivateKey.decrypt(ciphertext : RSAEncrypted) : ByteArray {
     val cipher = Cipher.getInstance("RSA/None/NoPadding", "BC")
     cipher.init(Cipher.DECRYPT_MODE, this)
-    return cipher.doFinal(encrypted.bytes)
+    return cipher.doFinal(ciphertext.ciphertext)
 }
 
 @Serializable
-data class RSAAESEncrypted(val rsaEncryptedAESKey: RSAEncrypted, val rsaEncryptedData : ByteArray)
+data class RSAAESEncrypted(val encryptedAESKey: RSAEncrypted, val rsaEncryptedData : ByteArray) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as RSAAESEncrypted
+
+        if (encryptedAESKey != other.encryptedAESKey) return false
+        if (!rsaEncryptedData.contentEquals(other.rsaEncryptedData)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = encryptedAESKey.hashCode()
+        result = 31 * result + rsaEncryptedData.contentHashCode()
+        return result
+    }
+}
 
 fun RSAPublicKey.encryptWithAes(data : ByteArray) : RSAAESEncrypted {
     val aesKey = AESKey.generate()
@@ -86,7 +119,7 @@ fun RSAPublicKey.encryptWithAes(data : ByteArray) : RSAAESEncrypted {
 }
 
 fun RSAPrivateKey.decrypt(encrypted : RSAAESEncrypted) : ByteArray {
-    val aesKey = AESKey(this.decrypt(encrypted.rsaEncryptedAESKey))
+    val aesKey = AESKey(this.decrypt(encrypted.encryptedAESKey))
     return aesKey.decrypt(encrypted.rsaEncryptedData)
 }
 /*
