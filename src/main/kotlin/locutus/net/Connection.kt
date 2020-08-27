@@ -6,18 +6,20 @@ import java.net.InetSocketAddress
 import java.security.interfaces.RSAPublicKey
 
  class Connection(
-    val peer: RemotePeer,
-    @Volatile var state: ConnectionState
-) {
+     val peer: RemotePeer,
+     val outboundKey : AESKey,
+     var outboundKeyReceived : Boolean,
+     var inboundKey : InboundKey?
+)
 
-}
+class InboundKey(val encryptedInboundKeyPrefix: ByteArray, val inboundKey : AESKey)
 
 
 sealed class ConnectionState {
     /**
      * Attempting to establish connection to remote peer
      */
-    class Connecting(val outboundKey: AESKey, val outboundIntroMessage : ByteArray) : ConnectionState()
+    class Connecting(val outboundKey: AESKey) : ConnectionState()
     class Connected(val inboundKey: AESKey, val inboundIntroMessage : ByteArray, val outboundKey: AESKey) : ConnectionState()
     object Disconnected : ConnectionState()
 }

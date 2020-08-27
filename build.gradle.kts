@@ -28,6 +28,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0-RC")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.0-RC")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.9")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.3.9")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.65.01")
     implementation("com.google.guava:guava:29.0-jre")
