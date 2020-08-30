@@ -25,7 +25,7 @@ private val logger = KotlinLogging.logger {}
  *
  */
 @ExperimentalSerializationApi
-class ConnectionManager(port: Int, private val myKey: RSAKeyPair, private val open: Boolean) {
+class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: Boolean) {
 
     private val connections = ConcurrentHashMap<InetSocketAddress, Connection>()
 
@@ -49,28 +49,33 @@ class ConnectionManager(port: Int, private val myKey: RSAKeyPair, private val op
 
     private fun packetReceived(sender: SocketAddress, rawPacket: ByteArray) {
         val connection = connections[sender]
-        val knownSender = connection != null
-        when {
-            knownSender -> {
-                when (val state = connection.state) {
-                    is ConnectionState.Connecting -> {
-
+        if (connection != null) {
+            connection.inboundKey.let { inboundKey ->
+                if (inboundKey != null) {
+                    val hasPrefix = rawPacket.startsWith(inboundKey.encryptedInboundKeyPrefix)
+                    val payload = if (hasPrefix) {
+                         rawPacket.copyOfRange(inboundKey.encryptedInboundKeyPrefix.size, rawPacket.size)
+                    } else {
+                        rawPacket
                     }
-                    is ConnectionState.Connected -> {
-                        if (rawPacket.contentEquals(state.inboundIntroMessage)) {
-                            logger.debug { "" }
-                        }
-                    }
-                    ConnectionState.Disconnected -> TODO()
+                    handlePayload(connection, payload)
+                } else { // We don't yet know inbound key
+                    val encryptedPrefix = rawPacket.copyOf(AESKey.RSA_ENCRYPTED_SIZE)
+                    val encryptedInboundKey = RSAEncrypted(encryptedPrefix)
+                    connection.inboundKey = InboundKey(encryptedPrefix, AESKey(myKey.private.decrypt(encryptedInboundKey)))
                 }
             }
-            open -> {
+        } else {
+            if (this.open) {
 
-            }
-            else -> {
-                logger.warn { "Packet received from unknown peer $sender, ignoring" }
+            } else {
+                logger.info("Disregarding packet from unknown sender $sender, and ConnectionManager isn't open")
             }
         }
+    }
+
+    private fun handlePayload(connection : Connection, payload : ByteArray) {
+
     }
 
     private val openConnectionRepeatDuration: Duration = Duration.ofMillis(200)
