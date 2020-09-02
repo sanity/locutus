@@ -1,0 +1,34 @@
+package locutus.net.messages
+
+import kotlinx.serialization.Serializable
+import java.net.*
+
+@Serializable
+data class Peer(val addr: ByteArray, val port: Int) {
+    constructor(socketAddress: InetSocketAddress) :
+            this(socketAddress.address.address, socketAddress.port)
+
+    val asSocketAddress: InetSocketAddress by lazy {
+        InetSocketAddress(InetAddress.getByAddress(addr), port)
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Peer
+
+        if (!addr.contentEquals(other.addr)) return false
+        if (port != other.port) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = addr.contentHashCode()
+        result = 31 * result + port
+        return result
+    }
+
+    override fun toString(): String = asSocketAddress.toString()
+}

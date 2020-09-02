@@ -5,7 +5,7 @@ import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
-import locutus.net.messages.Message
+import locutus.net.messages.*
 import locutus.tools.crypto.*
 import mu.KotlinLogging
 import java.net.*
@@ -16,8 +16,6 @@ import java.util.concurrent.*
 import java.util.concurrent.atomic.*
 import kotlin.concurrent.thread
 
-private val logger = KotlinLogging.logger {}
-
 /**
  * Responsible for establishing and maintaining encrypted UDP connections with remote peers.
  *
@@ -27,81 +25,124 @@ private val logger = KotlinLogging.logger {}
 @ExperimentalSerializationApi
 class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: Boolean) {
 
-    private val connections = ConcurrentHashMap<InetSocketAddress, Connection>()
+    private val logger = KotlinLogging.logger {}
 
-    val channel: DatagramChannel
+    private val connections = ConcurrentHashMap<Peer, Connection>()
+
+    private val channel: DatagramChannel = DatagramChannel.open()
 
     init {
-        channel = DatagramChannel.open()
         channel.socket().bind(InetSocketAddress(port))
-        val buf = ByteBuffer.allocate(Constants.MAX_UDP_PACKET_SIZE + 200)
-        thread { // TODO: Use non-blocking /
+        logger.info { "Listening on UDP port $port" }
+        val buf = ByteBuffer.allocateDirect(Constants.MAX_UDP_PACKET_SIZE + 200)
+        thread {
             while (true) {
-                val sender: SocketAddress = channel.receive(buf)
+                val sender = Peer(channel.receive(buf) as InetSocketAddress)
+                logger.trace { "Packet received from $sender of length ${buf.remaining()}" }
                 buf.flip()
                 val byteArray = ByteArray(buf.remaining())
                 buf.get(byteArray)
                 buf.clear()
-                packetReceived(sender, byteArray)
+                handleReceivedPacket(sender, byteArray)
             }
         }
     }
 
-    private fun packetReceived(sender: SocketAddress, rawPacket: ByteArray) {
+    private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
+        logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
         val connection = connections[sender]
         if (connection != null) {
+            logger.trace { "$sender is known" }
             connection.inboundKey.let { inboundKey ->
+
                 if (inboundKey != null) {
+                    logger.trace { "We have the inboundKey, check to see whether it's still being prepended to packet" }
                     val hasPrefix = rawPacket.startsWith(inboundKey.encryptedInboundKeyPrefix)
-                    val payload = if (hasPrefix) {
-                         rawPacket.copyOfRange(inboundKey.encryptedInboundKeyPrefix.size, rawPacket.size)
+                    val encryptedPayload = if (hasPrefix) {
+                        logger.debug { "$sender has prepended AES key although it is already known, stripping from packet" }
+                        // TODO:
+                        rawPacket.copyOfRange(inboundKey.encryptedInboundKeyPrefix.size, rawPacket.size)
                     } else {
                         rawPacket
                     }
-                    handlePayload(connection, payload)
-                } else { // We don't yet know inbound key
+                    val decryptedPayload = inboundKey.inboundKey.decrypt(encryptedPayload)
+                    handleDecryptedPacket(connection, decryptedPayload)
+
+                } else {
+                    logger.trace { "We don't have the inbound key, it should be prepended to packet, decrypt it" }
                     val encryptedPrefix = rawPacket.copyOf(AESKey.RSA_ENCRYPTED_SIZE)
                     val encryptedInboundKey = RSAEncrypted(encryptedPrefix)
-                    connection.inboundKey = InboundKey(encryptedPrefix, AESKey(myKey.private.decrypt(encryptedInboundKey)))
+                    val decryptedInboundKey = AESKey(myKey.private.decrypt(encryptedInboundKey))
+                    connection.inboundKey =
+                        InboundKey(encryptedPrefix, decryptedInboundKey)
+                    val encryptedPayload = rawPacket.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, rawPacket.size)
+                    val decryptedPayload = decryptedInboundKey.decrypt(encryptedPayload)
+                    handleDecryptedPacket(connection, decryptedPayload)
                 }
             }
         } else {
-            if (this.open) {
 
+            if (this.open) {
+                logger.debug { "Opening connection to stranger" }
+                val encryptedPrefix = rawPacket.copyOf(AESKey.RSA_ENCRYPTED_SIZE)
+                val encryptedInboundKey = RSAEncrypted(encryptedPrefix)
+                val decryptedInboundKey = AESKey(myKey.private.decrypt(encryptedInboundKey))
+                val newConnection = Connection(
+                    sender,
+                    ConnectionType.Stranger, InboundKey(encryptedPrefix, decryptedInboundKey)
+                )
+                connections[sender] = newConnection
+                val encryptedPayload = rawPacket.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, rawPacket.size)
+                val decryptedPayload = decryptedInboundKey.decrypt(encryptedPayload)
             } else {
                 logger.info("Disregarding packet from unknown sender $sender, and ConnectionManager isn't open")
             }
         }
     }
 
-    private fun handlePayload(connection : Connection, payload : ByteArray) {
-
+    private fun handleDecryptedPacket(connection: Connection, packet: ByteArray) {
+        val message = ProtoBuf.decodeFromByteArray(Message.serializer(), packet)
+        logger.debug { "Handling message: ${message::class.simpleName}" }
+        when (message) {
+            is Message.Handshake -> {
+                TODO()
+            }
+            is Message.HandshakeResponse -> {
+                TODO()
+            }
+            else -> {
+                TODO()
+            }
+        }
     }
 
     private val openConnectionRepeatDuration: Duration = Duration.ofMillis(200)
 
-    suspend fun connect(peer: RemotePeer, timeout: Duration) {
+    suspend fun connect(knownPeer: KnownPeer, timeout: Duration) {
+        logger.info { "Connecting to ${knownPeer.address} with timeout $timeout" }
         val giveUpTime = Instant.now().plus(timeout)
         val outboundKey = AESKey.generate()
-        val encryptedOutboundKey = peer.pubKey.encrypt(outboundKey.bytes)
+        val encryptedOutboundKey = knownPeer.pubKey.encrypt(outboundKey.bytes)
         val outboundKeySignature = myKey.private.sign(outboundKey.bytes)
         val outboundMessage =
             ProtoBuf.encodeToByteArray(Message.serializer(), Message.Handshake(false, outboundKeySignature))
         val encryptedOutboundMessage = outboundKey.encrypt(outboundMessage)
         val outboundIntroPacket = listOf(encryptedOutboundKey.ciphertext, encryptedOutboundMessage).merge()
-        val connection = Connection(peer, outboundKey, false, null)
-        connections[peer.address] = connection
+        val connection = Connection(knownPeer, outboundKey, false, null)
+        connections[knownPeer.address] = connection
         while (!connection.outboundKeyReceived && Instant.now() < giveUpTime) {
-            send(peer.address, outboundIntroPacket)
+            send(knownPeer.address, outboundIntroPacket)
             delay(openConnectionRepeatDuration)
         }
     }
 
     private fun send(to: SocketAddress, message: ByteArray) {
+        logger.trace { "Sending ${message.size}b message to $to" }
         channel.send(ByteBuffer.wrap(message), to)
     }
 
     fun send(to: SocketAddress, message: Message) {
+        logger.debug { "Sending $message to $to" }
         val connection = connections[to]
         requireNotNull(connection)
         val rawMessage = ProtoBuf.encodeToByteArray(Message.serializer(), message)

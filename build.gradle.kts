@@ -37,6 +37,7 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.2.0.502-SNAPSHOT")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.2.0.502-SNAPSHOT")
     testImplementation("io.kotest:kotest-property-jvm:4.2.0.502-SNAPSHOT")
+    implementation("ch.qos.logback:logback-classic:1.2.3")
 
 }
 

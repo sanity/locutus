@@ -1,21 +1,29 @@
 package locutus.net
 
-import locutus.net.messages.Message
+import locutus.net.messages.*
 import locutus.tools.crypto.AESKey
-import java.net.InetSocketAddress
 import java.security.interfaces.RSAPublicKey
 
- class Connection(
-     val peer: RemotePeer,
-     val outboundKey : AESKey,
-     @Volatile var outboundKeyReceived : Boolean,
-     @Volatile var inboundKey : InboundKey?
-)
+class Connection(
+    val peer: Peer,
+    val type: ConnectionType,
+    @Volatile var inboundKey: InboundKey?,
+) {
+    val receivedInbound get() = inboundKey != null
+}
 
-class InboundKey(val encryptedInboundKeyPrefix: ByteArray, val inboundKey : AESKey)
+sealed class ConnectionType {
+    data class Friend(
+        val outboundKey: AESKey,
+        @Volatile var outboundKeyReceived: Boolean,
+        val pubKey: RSAPublicKey
+    ) : ConnectionType()
 
-data class RemotePeer(val address: InetSocketAddress, val pubKey: RSAPublicKey)
+    object Stranger : ConnectionType()
+}
+
+data class KnownPeer(val address: Peer, val pubKey: RSAPublicKey)
 
 interface MessageListener {
-    fun receive(connection : Connection, message : Message)
+    fun receive(connection: Connection, message: Message)
 }

@@ -11,9 +11,9 @@ import java.time.Duration
 class ConnectionManagerSpec : FunSpec({
     test("two non-open managers connect") {
         val cm1 = ConnectionManager(13544, RSAKeyPair.create(), false)
-        val cm2 = ConnectionManager(13544, RSAKeyPair.create(), false)
-        val rp1 = RemotePeer(InetSocketAddress(InetAddress.getLocalHost(), cm1.port), cm1.myKey.public)
-        val rp2 = RemotePeer(InetSocketAddress(InetAddress.getLocalHost(), cm2.port), cm2.myKey.public)
+        val cm2 = ConnectionManager(13545, RSAKeyPair.create(), true)
+        val rp1 = KnownPeer(InetSocketAddress(InetAddress.getLocalHost(), cm1.port), cm1.myKey.public)
+        val rp2 = KnownPeer(InetSocketAddress(InetAddress.getLocalHost(), cm2.port), cm2.myKey.public)
         val df1 = async {
             cm1.connect(rp1, Duration.ofMillis(500))
         }
