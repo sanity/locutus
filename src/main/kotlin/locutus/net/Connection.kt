@@ -10,6 +10,16 @@ class Connection(
     @Volatile var inboundKey: InboundKey?,
 ) {
     val receivedInbound get() = inboundKey != null
+
+    val outboundKey: AESKey
+        get() {
+            return when (type) {
+                is ConnectionType.Friend -> type.outboundKey
+                ConnectionType.Stranger -> inboundKey.let {
+                    it?.aesKey ?: error("Stranger has no inboundKey so can't encrypt outbound message")
+                }
+            }
+        }
 }
 
 sealed class ConnectionType {
@@ -22,7 +32,7 @@ sealed class ConnectionType {
     object Stranger : ConnectionType()
 }
 
-data class KnownPeer(val address: Peer, val pubKey: RSAPublicKey)
+data class KnownPeer(val peer: Peer, val pubKey: RSAPublicKey)
 
 interface MessageListener {
     fun receive(connection: Connection, message: Message)

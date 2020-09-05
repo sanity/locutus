@@ -65,7 +65,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
                     } else {
                         rawPacket
                     }
-                    val decryptedPayload = inboundKey.inboundKey.decrypt(encryptedPayload)
+                    val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
                     handleDecryptedPacket(connection, decryptedPayload)
 
                 } else {
@@ -118,8 +118,13 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
 
     private val openConnectionRepeatDuration: Duration = Duration.ofMillis(200)
 
-    suspend fun connect(knownPeer: KnownPeer, timeout: Duration) {
-        logger.info { "Connecting to ${knownPeer.address} with timeout $timeout" }
+    sealed class ConnectResult {
+        object Connected : ConnectResult()
+        object TimedOut : ConnectResult()
+    }
+
+    suspend fun connect(knownPeer: KnownPeer, timeout: Duration) : ConnectResult {
+        logger.info { "Connecting to ${knownPeer.peer} with timeout $timeout" }
         val giveUpTime = Instant.now().plus(timeout)
         val outboundKey = AESKey.generate()
         val encryptedOutboundKey = knownPeer.pubKey.encrypt(outboundKey.bytes)
@@ -128,17 +133,31 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
             ProtoBuf.encodeToByteArray(Message.serializer(), Message.Handshake(false, outboundKeySignature))
         val encryptedOutboundMessage = outboundKey.encrypt(outboundMessage)
         val outboundIntroPacket = listOf(encryptedOutboundKey.ciphertext, encryptedOutboundMessage).merge()
-        val connection = Connection(knownPeer, outboundKey, false, null)
-        connections[knownPeer.address] = connection
-        while (!connection.outboundKeyReceived && Instant.now() < giveUpTime) {
-            send(knownPeer.address, outboundIntroPacket)
+        val type = ConnectionType.Friend(outboundKey, false, knownPeer.pubKey)
+        val connection = Connection(knownPeer.peer, type, null)
+        connections[knownPeer.peer] = connection
+        while (!type.outboundKeyReceived && Instant.now() < giveUpTime) {
+            send(knownPeer.peer, outboundIntroPacket)
             delay(openConnectionRepeatDuration)
+        }
+        return when {
+            Instant.now() >= giveUpTime -> {
+                connections.remove(knownPeer.peer)
+                ConnectResult.TimedOut
+            }
+            type.outboundKeyReceived -> {
+                logger.info { "OutboundKeyReceived, connected" }
+                ConnectResult.Connected
+            }
+            else -> {
+                error("Unknown connection result")
+            }
         }
     }
 
-    private fun send(to: SocketAddress, message: ByteArray) {
+    private fun send(to: Peer, message: ByteArray) {
         logger.trace { "Sending ${message.size}b message to $to" }
-        channel.send(ByteBuffer.wrap(message), to)
+        channel.send(ByteBuffer.wrap(message), to.asSocketAddress)
     }
 
     fun send(to: SocketAddress, message: Message) {
