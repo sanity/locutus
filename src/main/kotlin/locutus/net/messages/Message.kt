@@ -5,10 +5,12 @@ import locutus.tools.crypto.RSASignature
 
 @Serializable
 sealed class Message {
+    /**
+     * Sent to establish an initial connection, this is the only message that doesn't indicate that the sender
+     * has received the outbound synkey.
+     */
     @Serializable
-    data class Handshake(val yourKeyReceived: Boolean, val synKeySignature: RSASignature) : Message()
+    data class Hello(val helloReceived : Boolean) : Message()
 
-    @Serializable
-    data class HandshakeResponse(val yourExternalAddressIs : Peer) : Message()
 }
 
