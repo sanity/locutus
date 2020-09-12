@@ -1,8 +1,6 @@
 package locutus.net
 
-import io.ktor.network.tls.*
 import kotlinx.coroutines.future.await
-import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
@@ -19,11 +17,7 @@ import java.util.concurrent.atomic.*
 import kotlin.concurrent.thread
 
 /**
- * Responsible for establishing and maintaining encrypted UDP connections with remote peers.
- *
- * First message has encrypted synkey prepended, this message will be resent until it's acknowledged.
- *
- *
+ * [key]Hello(false, extAddr) ->
  */
 @ExperimentalSerializationApi
 class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: Boolean) {
@@ -51,17 +45,18 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         }
     }
 
+    /*
+        Connection exists, inboundKey known
+        Connection exists, inboundKey unknown
+     */
+
     private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
         logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
         val connection = connections[sender]
         if (connection != null) {
-            /*
-            we have a connection, which means we have the decrypt key
-             */
-
             logger.trace { "$sender is connected" }
-            val encryptedPayload = connection.inboundKeyPrefix.let { inboundKeyPrefix ->
-                if (inboundKeyPrefix != null && rawPacket.startsWith(inboundKeyPrefix)) {
+            val encryptedPayload = connection.inboundKey.let { inboundKey ->
+                if (inboundKey?.inboundKeyPrefix != null && rawPacket.startsWith(inboundKey.inboundKeyPrefix)) {
                     logger.debug { "$sender has prepended AES key although it is already known, disregarding" }
                     rawPacket.splitPacket().payload
                 } else {
@@ -79,16 +74,8 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
     private fun handleDecryptedPacket(connection: Connection, packet: ByteArray) {
         val message = ProtoBuf.decodeFromByteArray(Message.serializer(), packet)
         logger.debug { "Handling message: ${message::class.simpleName}" }
-        when (message) {
-            is Message.Handshake -> {
-                TODO()
-            }
-            is Message.HandshakeResponse -> {
-                TODO()
-            }
-            else -> {
-                TODO()
-            }
+        if (message.isResponse) {
+            connection.outboundKeyReceived = true
         }
     }
 
@@ -100,102 +87,79 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
     }
 
     /**
-     * @param knownPeer The peer to connect to
-     * @param isOpen Is [knownPeer] open?
-     * @param timeout How long to attempt to connect
+     * @param peer The peer to connect to
+     * @param isOpen Is [peer] open?
      */
-    suspend fun connect(
+    fun connect(
         peer: Peer,
         pubKey: RSAPublicKey,
-        isOpen: Boolean,
-        timeout: Duration
-    ): ConnectResult {
+        isOpen: Boolean
+    ) {
+        require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
 
-        logger.info { "Connecting to ${peer} with timeout $timeout" }
-        val giveUpTime = Instant.now().plus(timeout)
+        logger.info { "Establishing connection to $peer" }
         val outboundKey = AESKey.generate()
-        val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes)
-        val outboundKeySignature = myKey.private.sign(outboundKey.bytes)
-        val outboundMessage =
-            ProtoBuf.encodeToByteArray(Message.serializer(), TLSRecordType.Handshake(false, outboundKeySignature))
-        val encryptedOutboundMessage = outboundKey.encrypt(outboundMessage)
-        val outboundIntroPacket = listOf(encryptedOutboundKey.ciphertext, encryptedOutboundMessage).merge()
-        val connection = Connection(peer, false, outboundKey, if (isOpen) outboundKey else null, null)
+        val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
+        val connection = Connection(
+            peer = peer,
+            pubKey = pubKey,
+            outboundKeyReceived = false,
+            outboundKey = outboundKey,
+            encryptedOutboundKeyPrefix = encryptedOutboundKey,
+            inboundKey = if (isOpen) InboundKey(outboundKey, null) else null,
+        )
         connections[peer] = connection
-        while (!connection.outboundKeyReceived && Instant.now() < giveUpTime) {
-            send(peer, outboundIntroPacket)
-            delay(openConnectionRepeatDuration)
-        }
-        return when {
-            Instant.now() >= giveUpTime -> {
-                connections.remove(knownPeer.peer)
-                ConnectResult.TimedOut
-            }
-            type.outboundKeyReceived -> {
-                logger.info { "OutboundKeyReceived, connected" }
-                ConnectResult.Connected
-            }
-            else -> {
-                error("Unknown connection result")
-            }
-        }
+
     }
 
-    private fun send(to: Peer, message: ByteArray) {
-        logger.trace { "Sending ${message.size}b message to $to" }
-        channel.send(ByteBuffer.wrap(message), to.asSocketAddress)
-    }
-
-    fun send(to: SocketAddress, message: Message) {
+    fun sendAndListen(to: Peer, message: Message) {
         logger.debug { "Sending $message to $to" }
         val connection = connections[to]
         requireNotNull(connection)
-        val rawMessage = ProtoBuf.encodeToByteArray(Message.serializer(), message)
-        val encryptedMessage = connection.packetEncryptKey.encrypt(rawMessage)
+        val serializedMessage = ProtoBuf.encodeToByteArray(Message.serializer(), message)
+        val encryptedMessage = connection.outboundKey.encrypt(serializedMessage)
         val keyPrepend: List<ByteArray> =
             if (connection.outboundKeyReceived) {
                 emptyList()
             } else {
-                listOf(connection.peer.pubKey.encrypt(connection.packetEncryptKey.bytes).ciphertext)
+                listOf(connection.encryptedOutboundKeyPrefix)
             }
         val outboundRaw = (keyPrepend + encryptedMessage).merge()
-        send(to, outboundRaw)
+        logger.trace { "Sending ${outboundRaw.size}b message to $to" }
+        channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
     }
 
-    sealed class WaitForResult<M : Message> {
-        data class MessageReceived<M : Message>(val message: M) : WaitForResult<M>()
-        class TimedOut<M : Message> : WaitForResult<M>()
+    sealed class SendResult {
+        data class MessageReceived(val message: Message) : SendResult()
+        object TimedOut : SendResult()
     }
 
     class DeferredMessageListener(
-        val selector: (Message) -> Message?,
         val timeoutAt: Instant,
-        val deferred: Future<WaitForResult<*>>
+        val future: Future<SendResult>
     )
 
-    private val deferredMap = ConcurrentHashMap<SocketAddress, ConcurrentHashMap<Long, DeferredMessageListener>>()
+    private val deferredMap = ConcurrentHashMap<SocketAddress, ConcurrentHashMap<MessageId, DeferredMessageListener>>()
 
     private val listenerIds = AtomicLong(0)
 
-    suspend fun <M : Message, EXT : Any> sendAndWait(
-        from: SocketAddress,
-        toSend: Message? = null,
-        timeout: Duration,
-        extractor : (M) -> EXT,
-        extracted : EXT,
-        filter: (Message) -> M?
-    ): WaitForResult<M> {
-        val future = CompletableFuture<WaitForResult<*>>()
+    suspend fun sendAndListen(
+        to : Peer,
+        message: Message,
+        retryEvery : Duration = Duration.ofMillis(200),
+        retries : Int = 5
+    ): SendResult {
+        val future = CompletableFuture<SendResult>()
         val listener = DeferredMessageListener(waitFor, Instant.now().plus(timeout), future)
         val deferredId = listenerIds.incrementAndGet()
         deferredMap.computeIfAbsent(from) { ConcurrentHashMap() }[deferredId] = listener
         if (toSend != null) {
-            send(from, toSend)
+            sendAndListen(from, toSend)
         }
         val result = future.await()
         deferredMap.getValue(from).remove(deferredId)
         @Suppress("UNCHECKED_CAST")
-        return result as WaitForResult<M>
+        return result as SendResult<M>
     }
 }
 

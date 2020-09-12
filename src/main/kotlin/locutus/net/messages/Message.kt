@@ -1,16 +1,20 @@
 package locutus.net.messages
 
 import kotlinx.serialization.Serializable
+import kweb.util.random
 import locutus.tools.crypto.RSASignature
 
 @Serializable
 sealed class Message {
-    /**
-     * Sent to establish an initial connection, this is the only message that doesn't indicate that the sender
-     * has received the outbound synkey.
-     */
+
+    val id = MessageId()
+
+    abstract val responseTo : MessageId?
+
     @Serializable
-    data class Hello(val helloReceived : Boolean) : Message()
+    data class Hello(override val responseTo : MessageId? = null, val yourExternalAddress : Peer) : Message()
 
 }
 
+@Serializable
+data class MessageId(val long : Long = random.nextLong())

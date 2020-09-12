@@ -7,8 +7,11 @@ import java.security.interfaces.RSAPublicKey
 
 class Connection(
     val peer: Peer,
-    val outboundKeyReceived: Boolean,
+    val pubKey: RSAPublicKey?,
+    @Volatile var outboundKeyReceived: Boolean,
     val outboundKey : AESKey,
-    @Volatile var inboundKey : AESKey,
-    @Volatile var inboundKeyPrefix: ByteArray?
+    val encryptedOutboundKeyPrefix : ByteArray,
+    @Volatile var inboundKey : InboundKey?
 )
+
+class InboundKey(val aesKey: AESKey, val inboundKeyPrefix: ByteArray?)
