@@ -2,6 +2,7 @@ package locutus.net.messages
 
 import kotlinx.serialization.Serializable
 import java.net.*
+import java.security.interfaces.RSAPublicKey
 
 @Serializable
 data class Peer(val addr: ByteArray, val port: Int) {
@@ -32,3 +33,6 @@ data class Peer(val addr: ByteArray, val port: Int) {
 
     override fun toString(): String = asSocketAddress.toString()
 }
+
+@Serializable
+data class PeerWithKey(val peer: Peer, val key : RSAPublicKey)

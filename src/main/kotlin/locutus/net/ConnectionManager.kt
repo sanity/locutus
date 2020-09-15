@@ -1,20 +1,27 @@
 package locutus.net
 
+import com.google.common.cache.*
+import com.google.common.collect.MapMaker
+import com.google.gson.annotations.Since
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
 import locutus.net.messages.*
 import locutus.tools.crypto.*
 import mu.KotlinLogging
-import java.net.*
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.security.interfaces.RSAPublicKey
-import java.time.*
+import java.time.Duration
 import java.util.concurrent.*
-import java.util.concurrent.atomic.*
+import java.util.function.*
 import kotlin.concurrent.thread
+import kotlin.reflect.KClass
 
 /**
  * [key]Hello(false, extAddr) ->
@@ -63,34 +70,41 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
                     rawPacket
                 }
             }
-            val decryptedPayload = connection.inboundKey.decrypt(encryptedPayload)
+            val inboundKey = connection.inboundKey
+            requireNotNull(inboundKey) { "Can't decrypt packet without inboundKey" }
+            val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
             handleDecryptedPacket(connection, decryptedPayload)
 
         } else {
-            logger.trace { "Received message from unknown sender" }
+            logger.debug { "Received message from unknown sender" }
         }
     }
 
     private fun handleDecryptedPacket(connection: Connection, packet: ByteArray) {
         val message = ProtoBuf.decodeFromByteArray(Message.serializer(), packet)
         logger.debug { "Handling message: ${message::class.simpleName}" }
-        if (message.isResponse) {
-            connection.outboundKeyReceived = true
+        if (message.responseTo != null) {
+            logger.trace { "Message is response to ${message.responseTo}" }
+            if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
+            val listener = responseListeners[connection.peer]?.get(message.responseTo)
+                ?: error("No response listener found for reply message $message")
+            listener.complete(SendResult.MessageReceived(message))
+        } else {
+            logger.trace { "Message is not response" }
+            val listener = this.inboundMessageListeners[message::class]
+            if (listener != null) {
+                listener.accept(message)
+            } else {
+                logger.warn { "Received unknown message type ${message::class}, disregarding" }
+            }
         }
-    }
-
-    private val openConnectionRepeatDuration: Duration = Duration.ofMillis(200)
-
-    sealed class ConnectResult {
-        object Connected : ConnectResult()
-        object TimedOut : ConnectResult()
     }
 
     /**
      * @param peer The peer to connect to
      * @param isOpen Is [peer] open?
      */
-    fun connect(
+    fun addConnection(
         peer: Peer,
         pubKey: RSAPublicKey,
         isOpen: Boolean
@@ -112,7 +126,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
 
     }
 
-    fun sendAndListen(to: Peer, message: Message) {
+    fun send(to: Peer, message: Message) {
         logger.debug { "Sending $message to $to" }
         val connection = connections[to]
         requireNotNull(connection)
@@ -134,32 +148,78 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         object TimedOut : SendResult()
     }
 
-    class DeferredMessageListener(
-        val timeoutAt: Instant,
-        val future: Future<SendResult>
-    )
+    private val inboundMessageListeners = ConcurrentHashMap<KClass<Message>, Consumer<Message>>()
 
-    private val deferredMap = ConcurrentHashMap<SocketAddress, ConcurrentHashMap<MessageId, DeferredMessageListener>>()
+    inline fun <reified M : Message> listen(listener : Consumer<M>) {
+        this.listen(M::class, listener)
+    }
 
-    private val listenerIds = AtomicLong(0)
+    @PublishedApi
+    internal fun listen(msgClass : KClass<out Message>, listener : Consumer<out Message>) {
+        require(!inboundMessageListeners.containsKey(msgClass)) { "Listener already present for message type $msgClass" }
+        inboundMessageListeners[msgClass as KClass<Message>] = listener as Consumer<Message>
+    }
+
+    sealed class ResponseListener {
+        suspend fun messageReceived(message : Message) {
+            when(this) {
+                is Single -> {
+                    this.future.complete(SendResult.MessageReceived(message))
+                }
+                is Multiple -> this.channel.send(message)
+            }
+        }
+
+        abstract fun timeout()
+
+        data class Single(internal val future : CompletableFuture<SendResult>) : ResponseListener() {
+            override fun timeout() {
+                future.complete(SendResult.TimedOut)
+            }
+        }
+
+        data class Multiple(private val onClose :() -> Unit , internal val channel : Channel<Message>) : ResponseListener(), AutoCloseable {
+            val iter get() = channel.iterator()
+
+            override fun close() {
+                onClose()
+                channel.close()
+            }
+
+            override fun timeout() {
+                close()
+            }
+        }
+    }
+
+    internal val responseListeners : Cache<MessageId, ResponseListener> =
+        CacheBuilder.newBuilder().expireAfterAccess(Duration.ofMinutes(5))
+            .removalListener<MessageId, ResponseListener> { rn ->
+                rn.value.timeout()
+            }
+            .build()
 
     suspend fun sendAndListen(
-        to : Peer,
+        to: Peer,
         message: Message,
-        retryEvery : Duration = Duration.ofMillis(200),
-        retries : Int = 5
+        retryEvery: Duration = Duration.ofMillis(200),
+        retries: Int = 5
     ): SendResult {
         val future = CompletableFuture<SendResult>()
-        val listener = DeferredMessageListener(waitFor, Instant.now().plus(timeout), future)
-        val deferredId = listenerIds.incrementAndGet()
-        deferredMap.computeIfAbsent(from) { ConcurrentHashMap() }[deferredId] = listener
-        if (toSend != null) {
-            sendAndListen(from, toSend)
+        GlobalScope.launch(Dispatchers.IO) {
+            for (t in 1..retries) {
+                send(to, message)
+                delay(retryEvery)
+                if (future.isDone) break
+            }
+            if (!future.isDone) {
+                future.complete(SendResult.TimedOut)
+            }
         }
-        val result = future.await()
-        deferredMap.getValue(from).remove(deferredId)
+        val result: SendResult = future.await()
+        responseListeners[to]?.remove(message.id)
         @Suppress("UNCHECKED_CAST")
-        return result as SendResult<M>
+        return result
     }
 }
 

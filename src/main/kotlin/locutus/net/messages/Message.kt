@@ -14,6 +14,12 @@ sealed class Message {
     @Serializable
     data class Hello(override val responseTo : MessageId? = null, val yourExternalAddress : Peer) : Message()
 
+    /**
+     * Assimilation
+     */
+    @Serializable
+    data class AssimilateRequest(val assimilator : PeerWithKey)
+
 }
 
 @Serializable
