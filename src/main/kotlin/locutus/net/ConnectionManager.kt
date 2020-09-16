@@ -4,7 +4,7 @@ import com.google.common.cache.*
 import com.google.common.collect.MapMaker
 import com.google.gson.annotations.Since
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -19,6 +19,7 @@ import java.nio.channels.DatagramChannel
 import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 import java.util.concurrent.*
+import java.util.concurrent.atomic.*
 import java.util.function.*
 import kotlin.concurrent.thread
 import kotlin.reflect.KClass
@@ -82,11 +83,18 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
 
     private fun handleDecryptedPacket(connection: Connection, packet: ByteArray) {
         val message = ProtoBuf.decodeFromByteArray(Message.serializer(), packet)
+
+        messagesSentInResponse.getIfPresent(message.id).let { sentInResponse ->
+            if (sentInResponse != null && sentInResponse.isNotEmpty()) {
+                
+            }
+        }
+
         logger.debug { "Handling message: ${message::class.simpleName}" }
         if (message.responseTo != null) {
             logger.trace { "Message is response to ${message.responseTo}" }
             if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
-            val listener = responseListeners[connection.peer]?.get(message.responseTo)
+            val listener = responseListeners.getIfPresent(message.responseTo)
                 ?: error("No response listener found for reply message $message")
             listener.complete(SendResult.MessageReceived(message))
         } else {
@@ -140,12 +148,11 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
             }
         val outboundRaw = (keyPrepend + encryptedMessage).merge()
         logger.trace { "Sending ${outboundRaw.size}b message to $to" }
+        if (message.responseTo != null) {
+            // TODO: Don't want to re-add messages if they've already been sent
+            messagesSentInResponse[message.responseTo] += message
+        }
         channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
-    }
-
-    sealed class SendResult {
-        data class MessageReceived(val message: Message) : SendResult()
-        object TimedOut : SendResult()
     }
 
     private val inboundMessageListeners = ConcurrentHashMap<KClass<Message>, Consumer<Message>>()
@@ -160,66 +167,50 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         inboundMessageListeners[msgClass as KClass<Message>] = listener as Consumer<Message>
     }
 
-    sealed class ResponseListener {
-        suspend fun messageReceived(message : Message) {
-            when(this) {
-                is Single -> {
-                    this.future.complete(SendResult.MessageReceived(message))
-                }
-                is Multiple -> this.channel.send(message)
-            }
-        }
-
-        abstract fun timeout()
-
-        data class Single(internal val future : CompletableFuture<SendResult>) : ResponseListener() {
-            override fun timeout() {
-                future.complete(SendResult.TimedOut)
-            }
-        }
-
-        data class Multiple(private val onClose :() -> Unit , internal val channel : Channel<Message>) : ResponseListener(), AutoCloseable {
-            val iter get() = channel.iterator()
-
-            override fun close() {
-                onClose()
-                channel.close()
-            }
-
-            override fun timeout() {
-                close()
-            }
-        }
-    }
-
-    internal val responseListeners : Cache<MessageId, ResponseListener> =
+    private val responseListeners : Cache<MessageId, SendChannel<Message>> =
         CacheBuilder.newBuilder().expireAfterAccess(Duration.ofMinutes(5))
-            .removalListener<MessageId, ResponseListener> { rn ->
-                rn.value.timeout()
+            .removalListener<MessageId, SendChannel<Message>> { rn ->
+                rn.value.close()
             }
             .build()
 
-    suspend fun sendAndListen(
+    private val messagesSentInResponse :  LoadingCache<MessageId, ConcurrentLinkedQueue<Message>> =
+        CacheBuilder.newBuilder().expireAfterAccess(Duration.ofMinutes(5))
+            .build( object : CacheLoader<MessageId, ConcurrentLinkedQueue<Message>>() {
+                override fun load(key: MessageId): ConcurrentLinkedQueue<Message> {
+                    return ConcurrentLinkedQueue()
+                }
+
+            } )
+
+    fun sendAndListen(
         to: Peer,
-        message: Message,
-        retryEvery: Duration = Duration.ofMillis(200),
-        retries: Int = 5
-    ): SendResult {
-        val future = CompletableFuture<SendResult>()
-        GlobalScope.launch(Dispatchers.IO) {
-            for (t in 1..retries) {
-                send(to, message)
-                delay(retryEvery)
-                if (future.isDone) break
-            }
-            if (!future.isDone) {
-                future.complete(SendResult.TimedOut)
+        message: Message
+    ): ReceiveChannel<Message> {
+        val channel = Channel<Message>()
+        responseListeners.put(message.id, channel)
+        send(to, message)
+        return channel
+    }
+
+    suspend fun sendWithRetry(to : Peer, message : Message, retryEvery : Duration = Duration.ofMillis(200), maxRetries : Int = 5) : ReceiveChannel<Message> {
+        val responseReceived = AtomicBoolean(false)
+        val replyChannel = sendAndListen(to, message)
+        val wrappedReplyChannel = Channel<Message>()
+        GlobalScope.launch {
+            for (m in replyChannel) {
+                if (!responseReceived.get()) responseReceived.set(true)
+                wrappedReplyChannel.send(m)
             }
         }
-        val result: SendResult = future.await()
-        responseListeners[to]?.remove(message.id)
-        @Suppress("UNCHECKED_CAST")
-        return result
+        for (attempt in 1..maxRetries) {
+            if (responseReceived.get()) {
+                break
+            }
+            send(to, message)
+        }
+
+        return wrappedReplyChannel
     }
 }
 
