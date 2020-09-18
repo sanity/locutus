@@ -3,16 +3,17 @@ package locutus.net.messages
 import kotlinx.serialization.Serializable
 import kweb.util.random
 import locutus.tools.crypto.RSASignature
+import java.net.http.HttpResponse
 
 @Serializable
 sealed class Message {
 
     val id = MessageId()
 
-    abstract val responseTo : MessageId?
+    abstract val respondingTo : MessageId
 
     @Serializable
-    data class Hello(override val responseTo : MessageId? = null, val yourExternalAddress : Peer) : Message()
+    data class Hello(override val respondingTo: MessageId, val yourExternalAddress : Peer) : Message()
 
     /**
      * Assimilation

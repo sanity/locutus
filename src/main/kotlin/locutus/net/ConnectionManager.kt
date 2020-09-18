@@ -1,12 +1,8 @@
 package locutus.net
 
 import com.google.common.cache.*
-import com.google.common.collect.MapMaker
-import com.google.gson.annotations.Since
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
-import kotlinx.coroutines.future.await
-import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
@@ -53,11 +49,6 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         }
     }
 
-    /*
-        Connection exists, inboundKey known
-        Connection exists, inboundKey unknown
-     */
-
     private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
         logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
         val connection = connections[sender]
@@ -74,36 +65,34 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
             val inboundKey = connection.inboundKey
             requireNotNull(inboundKey) { "Can't decrypt packet without inboundKey" }
             val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
-            handleDecryptedPacket(connection, decryptedPayload)
+            val message = ProtoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
+            handleDecryptedPacket(connection, message)
 
         } else {
             logger.debug { "Received message from unknown sender" }
         }
     }
 
-    private fun handleDecryptedPacket(connection: Connection, packet: ByteArray) {
-        val message = ProtoBuf.decodeFromByteArray(Message.serializer(), packet)
+    private suspend fun handleDecryptedPacket(connection: Connection, message : Message) {
 
-        messagesSentInResponse.getIfPresent(message.id).let { sentInResponse ->
-            if (sentInResponse != null && sentInResponse.isNotEmpty()) {
-                
-            }
-        }
-
-        logger.debug { "Handling message: ${message::class.simpleName}" }
-        if (message.responseTo != null) {
-            logger.trace { "Message is response to ${message.responseTo}" }
-            if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
-            val listener = responseListeners.getIfPresent(message.responseTo)
-                ?: error("No response listener found for reply message $message")
-            listener.complete(SendResult.MessageReceived(message))
+        if (message.id in receivedMessageIds) {
+            logger.warn { "Disregarding message ${message.id} because it has already been received" }
         } else {
-            logger.trace { "Message is not response" }
-            val listener = this.inboundMessageListeners[message::class]
-            if (listener != null) {
-                listener.accept(message)
+            logger.debug { "Handling message: ${message::class.simpleName}" }
+            if (message.responseCount != null) {
+                logger.trace { "Message is response to ${message.respondingTo}" }
+                if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
+                val listener = responseListeners.getIfPresent(message.respondingTo)
+                    ?: error("No response listener found for reply message $message")
+                listener.send(message)
             } else {
-                logger.warn { "Received unknown message type ${message::class}, disregarding" }
+                logger.trace { "Message is not response" }
+                val listener = this.inboundMessageListeners[message::class]
+                if (listener != null) {
+                    listener.accept(message)
+                } else {
+                    logger.warn { "Received unknown message type ${message::class}, disregarding" }
+                }
             }
         }
     }
@@ -148,10 +137,6 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
             }
         val outboundRaw = (keyPrepend + encryptedMessage).merge()
         logger.trace { "Sending ${outboundRaw.size}b message to $to" }
-        if (message.responseTo != null) {
-            // TODO: Don't want to re-add messages if they've already been sent
-            messagesSentInResponse[message.responseTo] += message
-        }
         channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
     }
 
@@ -162,7 +147,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
     }
 
     @PublishedApi
-    internal fun listen(msgClass : KClass<out Message>, listener : Consumer<out Message>) {
+    internal fun <M : Message> listen(msgClass : KClass<M>, listener : Consumer<M>) {
         require(!inboundMessageListeners.containsKey(msgClass)) { "Listener already present for message type $msgClass" }
         inboundMessageListeners[msgClass as KClass<Message>] = listener as Consumer<Message>
     }
@@ -174,14 +159,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
             }
             .build()
 
-    private val messagesSentInResponse :  LoadingCache<MessageId, ConcurrentLinkedQueue<Message>> =
-        CacheBuilder.newBuilder().expireAfterAccess(Duration.ofMinutes(5))
-            .build( object : CacheLoader<MessageId, ConcurrentLinkedQueue<Message>>() {
-                override fun load(key: MessageId): ConcurrentLinkedQueue<Message> {
-                    return ConcurrentLinkedQueue()
-                }
-
-            } )
+    private val receivedMessageIds = ConcurrentSkipListSet<MessageId>()
 
     fun sendAndListen(
         to: Peer,
