@@ -4,13 +4,14 @@ import kotlinx.serialization.Serializable
 import kweb.util.random
 import locutus.tools.crypto.RSASignature
 import java.net.http.HttpResponse
+import java.security.interfaces.RSAPublicKey
 
 @Serializable
 sealed class Message {
 
     val id = MessageId()
 
-    abstract val respondingTo : MessageId
+    abstract val respondingTo : MessageId?
 
     @Serializable
     data class Hello(override val respondingTo: MessageId, val yourExternalAddress : Peer) : Message()
@@ -19,8 +20,13 @@ sealed class Message {
      * Assimilation
      */
     @Serializable
-    data class AssimilateRequest(val assimilator : PeerWithKey)
+    data class AssimilateRequest(val pubKey : RSAPublicKey) : Message() {
+        override val respondingTo: MessageId? = null
+    }
 
+
+    @Serializable
+    data class AssimilateReply(override val respondingTo: MessageId?, val yourExternalAddress: Peer) : Message()
 }
 
 @Serializable

@@ -1,12 +1,19 @@
 package locutus.net
 
-import com.google.common.cache.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.*
+import com.google.common.cache.Cache
+import com.google.common.cache.CacheBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
-import locutus.net.messages.*
+import locutus.net.messages.Message
+import locutus.net.messages.MessageId
+import locutus.net.messages.Peer
 import locutus.tools.crypto.*
 import mu.KotlinLogging
 import java.net.InetSocketAddress
@@ -14,9 +21,10 @@ import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.security.interfaces.RSAPublicKey
 import java.time.Duration
-import java.util.concurrent.*
-import java.util.concurrent.atomic.*
-import java.util.function.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.function.Consumer
 import kotlin.concurrent.thread
 import kotlin.reflect.KClass
 
@@ -38,18 +46,20 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         val buf = ByteBuffer.allocateDirect(Constants.MAX_UDP_PACKET_SIZE + 200)
         thread {
             while (true) {
-                val sender = Peer(channel.receive(buf) as InetSocketAddress)
-                logger.trace { "Packet received from $sender of length ${buf.remaining()}" }
-                buf.flip()
-                val byteArray = ByteArray(buf.remaining())
-                buf.get(byteArray)
-                buf.clear()
-                handleReceivedPacket(sender, byteArray)
+                    val sender = Peer(channel.receive(buf) as InetSocketAddress)
+                    logger.trace { "Packet received from $sender of length ${buf.remaining()}" }
+                    buf.flip()
+                    val byteArray = ByteArray(buf.remaining())
+                    buf.get(byteArray)
+                    buf.clear()
+                    GlobalScope.launch(Dispatchers.IO) {
+                        handleReceivedPacket(sender, byteArray)
+                    }
             }
         }
     }
 
-    private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
+    private suspend fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
         logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
         val connection = connections[sender]
         if (connection != null) {
@@ -66,32 +76,34 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
             requireNotNull(inboundKey) { "Can't decrypt packet without inboundKey" }
             val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
             val message = ProtoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
-            handleDecryptedPacket(connection, message)
+            handleMessage(connection, message)
 
         } else {
             logger.debug { "Received message from unknown sender" }
         }
     }
 
-    private suspend fun handleDecryptedPacket(connection: Connection, message : Message) {
-
+    private suspend fun handleMessage(connection: Connection, message : Message) {
+        logger.trace { "" }
         if (message.id in receivedMessageIds) {
             logger.warn { "Disregarding message ${message.id} because it has already been received" }
         } else {
             logger.debug { "Handling message: ${message::class.simpleName}" }
-            if (message.responseCount != null) {
-                logger.trace { "Message is response to ${message.respondingTo}" }
-                if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
-                val listener = responseListeners.getIfPresent(message.respondingTo)
-                    ?: error("No response listener found for reply message $message")
-                listener.send(message)
-            } else {
-                logger.trace { "Message is not response" }
-                val listener = this.inboundMessageListeners[message::class]
-                if (listener != null) {
-                    listener.accept(message)
+            message.respondingTo.let { respondingTo ->
+                if (respondingTo != null) {
+                    logger.trace { "Message is response to ${respondingTo}" }
+                    if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
+                    val listener = responseListeners.getIfPresent(respondingTo)
+                        ?: error("No response listener found for reply message $message")
+                    listener.send(message)
                 } else {
+                    logger.trace { "Message is not response" }
+                    val listener = this.inboundMessageListeners[message::class]
+                    if (listener != null) {
+                        listener.accept(InboundMessage(message, connection.peer))
+                    } else {
                     logger.warn { "Received unknown message type ${message::class}, disregarding" }
+                }
                 }
             }
         }
@@ -140,16 +152,18 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
     }
 
-    private val inboundMessageListeners = ConcurrentHashMap<KClass<Message>, Consumer<Message>>()
+    private val inboundMessageListeners = ConcurrentHashMap<KClass<Message>, Consumer<InboundMessage<Message>>>()
 
-    inline fun <reified M : Message> listen(listener : Consumer<M>) {
+    data class InboundMessage<M : Message>(val message : M, val sender : Peer)
+
+    inline fun <reified M : Message> listen(listener : Consumer<InboundMessage<M>>) {
         this.listen(M::class, listener)
     }
 
     @PublishedApi
-    internal fun <M : Message> listen(msgClass : KClass<M>, listener : Consumer<M>) {
+    internal fun <M : Message> listen(msgClass : KClass<M>, listener : Consumer<InboundMessage<M>>) {
         require(!inboundMessageListeners.containsKey(msgClass)) { "Listener already present for message type $msgClass" }
-        inboundMessageListeners[msgClass as KClass<Message>] = listener as Consumer<Message>
+        inboundMessageListeners[msgClass as KClass<Message>] = listener as Consumer<InboundMessage<Message>>
     }
 
     private val responseListeners : Cache<MessageId, SendChannel<Message>> =
