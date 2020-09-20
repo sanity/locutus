@@ -1,5 +1,6 @@
 package locutus.tools.crypto
 
+import java.nio.ByteBuffer
 import java.security.MessageDigest
 
 fun ByteArray.hash(): ByteArray {

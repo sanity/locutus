@@ -13,14 +13,11 @@ sealed class Message {
 
     abstract val respondingTo : MessageId?
 
-    @Serializable
-    data class Hello(override val respondingTo: MessageId, val yourExternalAddress : Peer) : Message()
-
     /**
      * Assimilation
      */
     @Serializable
-    data class AssimilateRequest(val pubKey : RSAPublicKey) : Message() {
+    data class AssimilateRequest(val joiner : Peer?, val pubKey : RSAPublicKey) : Message() {
         override val respondingTo: MessageId? = null
     }
 
