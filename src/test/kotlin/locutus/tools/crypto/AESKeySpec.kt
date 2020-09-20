@@ -2,6 +2,7 @@ package locutus.tools.crypto
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import locutus.tools.crypto.rsa.*
 
 class AESKeySpec : FunSpec({
     test("Create, encrypt and decrypt") {

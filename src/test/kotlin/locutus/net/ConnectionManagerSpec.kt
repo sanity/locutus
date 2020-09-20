@@ -4,7 +4,7 @@ import io.kotest.core.spec.style.FunSpec
 import kotlinx.coroutines.async
 import kotlinx.serialization.ExperimentalSerializationApi
 import locutus.net.messages.Peer
-import locutus.tools.crypto.RSAKeyPair
+import locutus.tools.crypto.rsa.RSAKeyPair
 import java.net.*
 
 @ExperimentalSerializationApi

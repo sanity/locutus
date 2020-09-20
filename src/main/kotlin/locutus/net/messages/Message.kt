@@ -2,8 +2,6 @@ package locutus.net.messages
 
 import kotlinx.serialization.Serializable
 import kweb.util.random
-import locutus.tools.crypto.RSASignature
-import java.net.http.HttpResponse
 import java.security.interfaces.RSAPublicKey
 
 @Serializable
