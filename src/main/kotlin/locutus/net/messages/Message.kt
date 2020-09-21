@@ -14,14 +14,21 @@ sealed class Message {
     /**
      * Assimilation
      */
+
     @Serializable
-    data class AssimilateRequest(val joiner : Peer?, val pubKey : RSAPublicKey) : Message() {
-        override val respondingTo: MessageId? = null
+    sealed class Assimilate : Message() {
+        /**
+         * Sent by joiner to gateway, requesting assimilation
+         */
+        class Request(val joiner : Peer?, override val respondingTo: MessageId) : Assimilate()
+
+        class RequestSeed(val joiner : Peer, override val respondingTo: MessageId) : Assimilate()
+
+        class RespondSeed(val seed : Long?, override val respondingTo: MessageId) : Assimilate()
+
+        class RespondWithSeeds(val seed : Set<Long>, override val respondingTo: MessageId) : Assimilate()
     }
 
-
-    @Serializable
-    data class AssimilateReply(override val respondingTo: MessageId?, val yourExternalAddress: Peer) : Message()
 }
 
 @Serializable

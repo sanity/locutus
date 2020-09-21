@@ -1,6 +1,8 @@
 package locutus.tools.math
 
 import kotlinx.serialization.Serializable
+import locutus.tools.crypto.hash
+import java.security.interfaces.RSAPublicKey
 import kotlin.math.abs
 
 @Serializable
@@ -21,6 +23,11 @@ data class Position(val value : Double) {
                 divisor *= 256
             }
             return Position(value)
+        }
+
+        @ExperimentalUnsignedTypes
+        fun fromRSAPublicKey(pubKey : RSAPublicKey) : Position {
+            return fromByteArray(pubKey.encoded.hash().toUByteArray())
         }
     }
 }

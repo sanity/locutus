@@ -10,7 +10,7 @@
 
 `Gateway -> AssimilationResponse -> Joiner`
 
-`Gateway -> Seed 1 -> AssimilationRequest`
+`Gateway -> Sponsor -> AssimilationRequest`
 
 `Seed 1 -> Gateway -> AssimilationAccept(salt1)`
 
