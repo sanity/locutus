@@ -1,7 +1,12 @@
+@file:UseSerializers(RSAPublicKeySerializer::class)
+
 package locutus.net.messages
 
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kweb.util.random
+import locutus.tools.crypto.rsa.RSAPublicKeySerializer
+import locutus.tools.math.Location
+import java.security.PublicKey
 import java.security.interfaces.RSAPublicKey
 
 @Serializable
@@ -17,16 +22,38 @@ sealed class Message {
 
     @Serializable
     sealed class Assimilate : Message() {
+        /*
+         * Participants
+         *
+         * joiner: The peer that wants to join
+         * gateway: An open peer through which the peer wishes to join, selects a location for the joiner
+         *          and then forwards to peers in the direction of the location
+         *
+         */
+
+
         /**
          * Sent by joiner to gateway, requesting assimilation
          */
-        class Request(val joiner : Peer?, override val respondingTo: MessageId) : Assimilate()
+        @Serializable
+        class PleaseIntroduce(val myPubKey : RSAPublicKey) : Assimilate() {
+            override val respondingTo: MessageId? = null
+        }
 
-        class RequestSeed(val joiner : Peer, override val respondingTo: MessageId) : Assimilate()
+        @Serializable
+        class WillIntroduce(override val respondingTo: MessageId, val yourAddress : Peer, val yourLocation : Location) : Assimilate()
 
-        class RespondSeed(val seed : Long?, override val respondingTo: MessageId) : Assimilate()
+        @Serializable
+        class RefuseIntroduction(override val respondingTo: MessageId, val yourAddress : Peer) : Assimilate()
 
-        class RespondWithSeeds(val seed : Set<Long>, override val respondingTo: MessageId) : Assimilate()
+        @Serializable
+        class NewPeer(val newPeer : Peer, val joinerPubKey : RSAPublicKey) : Assimilate() {
+            override val respondingTo: MessageId? = null
+        }
+
+        @Serializable
+        class NewPeerAccept(override val respondingTo: MessageId, val acceptorPeer: Peer, val acceptorPubKey : RSAPublicKey) : Assimilate()
+
     }
 
 }
