@@ -36,18 +36,18 @@ sealed class Message {
          * Sent by joiner to gateway, requesting assimilation
          */
         @Serializable
-        class PleaseIntroduce(val myPubKey : RSAPublicKey) : Assimilate() {
+        class IntroductionRequest(val myPubKey : RSAPublicKey) : Assimilate() {
             override val respondingTo: MessageId? = null
         }
 
         @Serializable
-        class WillIntroduce(override val respondingTo: MessageId, val yourAddress : Peer, val yourLocation : Location) : Assimilate()
+        class AcceptRequest(override val respondingTo: MessageId, val yourAddress : Peer, val yourLocation : Location) : Assimilate()
 
         @Serializable
-        class RefuseIntroduction(override val respondingTo: MessageId, val yourAddress : Peer) : Assimilate()
+        class RefuseRequest(override val respondingTo: MessageId, val yourAddress : Peer) : Assimilate()
 
         @Serializable
-        class NewPeer(val newPeer : Peer, val joinerPubKey : RSAPublicKey) : Assimilate() {
+        class OfferNewPeer(val newPeer : Peer, val joinerPubKey : RSAPublicKey, val newPeerLocation : Location) : Assimilate() {
             override val respondingTo: MessageId? = null
         }
 
