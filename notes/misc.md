@@ -1,5 +1,7 @@
 ### Business model
 
+* Coinbase + Patreon + decentralized twitter
+
 Pay to permit inbound messages, effectively sender provides a deposit, could be done centrally - donation would go to
 project, receiver, or other charity, at receiver's option.  Sender can opt to make it unilateral, or at receiver's option.
 
@@ -23,3 +25,7 @@ Anyone can create an "account", but only locutus-signed accounts come with a sta
 of the balance at a time of your choosing, this valid transactions may only occur through locutus-signed accounts.
 
 Accounts could optionally be "recordless", maintaining only a *validated* summary of the balance - but would
+
+Threat:
+Network could be disconnected, resulting in possible double-spend.
+FairShare could be required to validate each transaction in realtime
