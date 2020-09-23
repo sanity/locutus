@@ -2,19 +2,20 @@ package locutus.tools.math
 
 import kotlinx.serialization.Serializable
 import locutus.tools.crypto.hash
-import org.bouncycastle.util.encoders.UTF8
 import java.security.interfaces.RSAPublicKey
 import kotlin.math.abs
 
 @Serializable
-data class Location(val value : Double) {
+data class Location(val value: Double) : Comparable<Location> {
+
     init {
-        require(value in 0.0..1.0) {"$value must be between 0 and 1 inclusive"}
+        require(value in 0.0..1.0) { "$value must be between 0 and 1 inclusive" }
     }
 
     companion object {
+
         @ExperimentalUnsignedTypes
-        fun fromByteArray(ba: UByteArray, precision: Int = 7) : Location {
+        fun fromByteArray(ba: UByteArray, precision: Int = 7): Location {
             require(precision in 1..7) { "precision: $precision must be between 1 .. 7" }
 
             var value = 0.0
@@ -27,10 +28,12 @@ data class Location(val value : Double) {
         }
 
         @ExperimentalUnsignedTypes
-        fun fromRSAPublicKey(pubKey : RSAPublicKey, label : String) : Location {
+        fun fromRSAPublicKey(pubKey: RSAPublicKey, label: String): Location {
             return fromByteArray((pubKey.encoded + label.toByteArray(Charsets.UTF_8)).hash().toUByteArray())
         }
     }
+
+    override fun compareTo(other: Location): Int = value.compareTo(other.value)
 }
 
 infix fun Location.distance(other : Location) : Double {

@@ -4,9 +4,8 @@ package locutus.net.messages
 
 import kotlinx.serialization.*
 import kweb.util.random
-import locutus.tools.crypto.rsa.RSAPublicKeySerializer
+import locutus.tools.crypto.rsa.*
 import locutus.tools.math.Location
-import java.security.PublicKey
 import java.security.interfaces.RSAPublicKey
 
 @Serializable
@@ -31,12 +30,8 @@ sealed class Message {
          *
          */
 
-
-        /**
-         * Sent by joiner to gateway, requesting assimilation
-         */
         @Serializable
-        class GatewayRequest(val myPubKey : RSAPublicKey) : Assimilate() {
+        class GatewayRequest(val myPubKey: RSAPublicKey) : Assimilate() {
 
             override val respondingTo: MessageId? = null
         }

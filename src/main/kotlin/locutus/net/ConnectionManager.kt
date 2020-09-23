@@ -185,7 +185,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         return channel
     }
 
-    suspend fun sendWithRetry(
+    suspend fun sendAndWait(
         to: Peer,
         message: Message,
         retryEvery: Duration = Duration.ofMillis(200),
