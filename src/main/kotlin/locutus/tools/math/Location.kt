@@ -2,6 +2,7 @@ package locutus.tools.math
 
 import kotlinx.serialization.Serializable
 import locutus.tools.crypto.hash
+import org.bouncycastle.util.encoders.UTF8
 import java.security.interfaces.RSAPublicKey
 import kotlin.math.abs
 
@@ -26,8 +27,8 @@ data class Location(val value : Double) {
         }
 
         @ExperimentalUnsignedTypes
-        fun fromRSAPublicKey(pubKey : RSAPublicKey) : Location {
-            return fromByteArray(pubKey.encoded.hash().toUByteArray())
+        fun fromRSAPublicKey(pubKey : RSAPublicKey, label : String) : Location {
+            return fromByteArray((pubKey.encoded + label.toByteArray(Charsets.UTF_8)).hash().toUByteArray())
         }
     }
 }
