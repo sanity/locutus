@@ -37,6 +37,7 @@ sealed class Message {
          */
         @Serializable
         class GatewayRequest(val myPubKey : RSAPublicKey) : Assimilate() {
+
             override val respondingTo: MessageId? = null
         }
 
@@ -48,6 +49,7 @@ sealed class Message {
             init {
                 require(connectionsRequired < 20)
             }
+
 
             override val respondingTo: MessageId? = null
         }
