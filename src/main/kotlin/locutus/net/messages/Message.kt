@@ -37,7 +37,7 @@ sealed class Message {
         }
 
         @Serializable
-        class GatewayAccept(override val respondingTo: MessageId, val yourAddress : Peer, val yourLocation : Location) : Assimilate()
+        class GatewayAck(override val respondingTo: MessageId, val yourAddress : Peer, val yourLocation : Location) : Assimilate()
 
         @Serializable
         class NewPeer(val joiner : Peer, val joinerPubKey : RSAPublicKey, val location: Location, val connectionsRequired : Int) : Assimilate() {

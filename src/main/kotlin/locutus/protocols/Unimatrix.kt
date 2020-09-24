@@ -28,7 +28,7 @@ class Unimatrix(private val cm: ConnectionManager, private val gateways: Set<Pee
                         maxRetries = 2
                 )) {
                     when (response) {
-                        is GatewayAccept -> {
+                        is GatewayAck -> {
                             myLocation = response.yourLocation
                         }
                         is NewPeerAccept -> {
@@ -42,7 +42,7 @@ class Unimatrix(private val cm: ConnectionManager, private val gateways: Set<Pee
 
     }
 
-    private fun gatewayAccepted(gateway: PeerWithKey, response: GatewayAccept) {
+    private fun gatewayAccepted(gateway: PeerWithKey, response: GatewayAck) {
 
     }
 
