@@ -4,7 +4,7 @@ import kotlinx.coroutines.channels.*
 import locutus.net.messages.Message.Ring.JoinRequest
 import locutus.net.messages.MessageRouter.*
 import mu.KotlinLogging
-import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
+import java.util.concurrent.ConcurrentHashMap
 import java.net.InetSocketAddress
 import kotlin.reflect.KClass
 
@@ -75,5 +75,5 @@ suspend fun tst() {
     }
 }
 
-private typealias ExtractorLabel = String
-private typealias KeyType = Any
+typealias ExtractorLabel = String
+typealias KeyType = Any
