@@ -13,8 +13,12 @@ import mu.*
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
+import java.time.Duration
 import java.util.concurrent.*
 import kotlin.concurrent.thread
+import java.util.concurrent.atomic.AtomicBoolean
+
+
 
 /**
  * Responsible for securely transmitting [Message]s between [Peer]s.
@@ -115,23 +119,12 @@ class ConnectionManager(
         extractor: MessageRouter.Extractor<MType, KeyType>,
         key: KeyType
     ): ReceiveChannel<SenderMessage<MType>> {
-        val messageChannel : Channel<SenderMessage<MType>> = router.listeners
-            .computeIfAbsent(MType::class) { ConcurrentHashMap<String, ConcurrentHashMap<Any, SendChannel<SenderMessage<Message>>>>() }
-            .computeIfAbsent(extractor.label) { ConcurrentHashMap<Any, SendChannel<SenderMessage<Message>>>() }
-            .compute(key) { _, existingChannel ->
-                if (existingChannel != null) {
-                    error("Listener already exists for ${extractor.label}->$key")
-                } else {
-                    Channel()
-                }
-            } as Channel<SenderMessage<MType>>
-        router.extractors.putIfAbsent(extractor.label, extractor as Extractor<Message, Any>)
-        messageChannel.invokeOnClose {
-            router.listeners[MType::class]?.get(extractor.label)?.remove(key)
-        }
+        val messageChannel = router.add(extractor, key)
         send(to, message)
         return messageChannel
     }
+
+    class Retry(val times : Int, val every : Duration)
 
     /**
      * Listen for incoming messages
@@ -140,21 +133,7 @@ class ConnectionManager(
         extractor: MessageRouter.Extractor<MType, KeyType>,
         key: KeyType
     ): ReceiveChannel<SenderMessage<MType>> {
-        val messageChannel : Channel<SenderMessage<MType>> = router.listeners
-            .computeIfAbsent(MType::class) { ConcurrentHashMap<ExtractorLabel, ConcurrentHashMap<locutus.net.messages.KeyType, SendChannel<SenderMessage<Message>>>>() }
-            .computeIfAbsent(extractor.label) { ConcurrentHashMap<locutus.net.messages.KeyType, SendChannel<SenderMessage<Message>>>() }
-            .compute(key) { _, existingChannel ->
-                if (existingChannel != null) {
-                    error("Listener already exists for ${extractor.label}->$key")
-                } else {
-                    Channel()
-                }
-            } as Channel<SenderMessage<MType>>
-        router.extractors.putIfAbsent(extractor.label, extractor as Extractor<Message, Any>)
-        messageChannel.invokeOnClose {
-            router.listeners[MType::class]?.get(extractor.label)?.remove(key)
-        }
-        return messageChannel
+        return router.add(extractor, key)
     }
 
     // TODO: This should be an expiring cache
