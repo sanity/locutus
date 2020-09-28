@@ -24,7 +24,7 @@ class MessageRouterSpec : FunSpec({
         val fooReceived = ConcurrentLinkedQueue<SenderMessage<FooMessage>>()
 
         context("Create listener for FooMessage(1) that will cancel after initial message is received") {
-            val channel = messageRouter.add(fooExtractor, 1)
+            val channel = messageRouter.listen(fooExtractor, 1)
 
             test("Listener should have been added to MessageRouter") {
                 messageRouter.listeners[FooMessage::class]?.get("fooExtractor")?.size shouldBe 1

@@ -19,7 +19,7 @@ class MessageRouter {
     /**
      * Cancelling the ReceiveChannel will result in the removal of the key listener
      */
-    inline fun <reified MType : Message, KeyType : Any> add(
+    inline fun <reified MType : Message, KeyType : Any> listen(
         extractor: Extractor<MType, KeyType>,
         key: KeyType
     ) : ReceiveChannel<SenderMessage<MType>> {
@@ -68,7 +68,7 @@ suspend fun tst() {
     val joinRequestExtractor = object : Extractor<JoinRequest, Peer>("joinRequestExtractor") {
         override fun invoke(sm : MessageRouter.SenderMessage<JoinRequest>) = sm.sender
     }
-    mr.add(joinRequestExtractor, Peer(InetSocketAddress.createUnresolved("localhost", 1233))).consume {
+    mr.listen(joinRequestExtractor, Peer(InetSocketAddress.createUnresolved("localhost", 1233))).consume {
         for ((sender, joinRequest) in this) {
 
         }

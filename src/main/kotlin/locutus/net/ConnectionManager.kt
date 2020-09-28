@@ -2,6 +2,7 @@ package locutus.net
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
@@ -16,8 +17,6 @@ import java.nio.channels.DatagramChannel
 import java.time.Duration
 import java.util.concurrent.*
 import kotlin.concurrent.thread
-import java.util.concurrent.atomic.AtomicBoolean
-
 
 
 /**
@@ -119,21 +118,55 @@ class ConnectionManager(
         extractor: MessageRouter.Extractor<MType, KeyType>,
         key: KeyType
     ): ReceiveChannel<SenderMessage<MType>> {
-        val messageChannel = router.add(extractor, key)
+        val messageChannel = router.listen(extractor, key)
         send(to, message)
         return messageChannel
     }
 
-    class Retry(val times : Int, val every : Duration)
+    /**
+     * Send a message and listen for a response, this ensures that the response listener
+     * is registered before the message is sent to avoid possible race condition.
+     *
+     * Will resend the message every [retryDelay] up to [retries] times until [Retryable.confirmReceipt] is called.
+     * This shouldn't be a problem as [ConnectionManager] will automatically disregard duplicate messages (determined
+     * by their [MessageId].
+     */
+    inline fun <reified MType : Message, KeyType : Any> sendReceive(
+        to: Peer,
+        message: Message,
+        extractor: Extractor<MType, KeyType>,
+        key: KeyType,
+        retries : Int,
+        retryDelay : Duration
+    ): Retryable<MType> {
+        val retryable = Retryable(sendReceive(to, message, extractor, key))
+        // TODO: GlobalScope is evil
+        GlobalScope.launch(Dispatchers.IO) {
+            for (retryNo in 1 .. retries) {
+                delay(retryDelay)
+                if (retryable.receiptConfirmed) break
+                send(to, message)
+            }
+        }
+        return retryable
+    }
+
+    class Retryable<MType : Message> @PublishedApi internal constructor(val channel : ReceiveChannel<SenderMessage<MType>>) {
+        @PublishedApi internal var receiptConfirmed = false
+
+        fun confirmReceipt() {
+            receiptConfirmed = true
+        }
+    }
 
     /**
-     * Listen for incoming messages
+     * Listen for incoming messages, see [MessageRouter.listen]
      */
     inline fun <reified MType : Message, KeyType : Any> listen(
         extractor: MessageRouter.Extractor<MType, KeyType>,
         key: KeyType
     ): ReceiveChannel<SenderMessage<MType>> {
-        return router.add(extractor, key)
+        return router.listen(extractor, key)
     }
 
     // TODO: This should be an expiring cache
@@ -190,17 +223,3 @@ private class SplitPacket(val decryptKey: ByteArray, val payload: ByteArray)
 private fun ByteArray.splitPacket(): SplitPacket {
     return SplitPacket(this.copyOf(AESKey.RSA_ENCRYPTED_SIZE), this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size))
 }
-/*
-
-Layers
-------
-
-1st layer, equiv to IP address.  initial join procedure should lead to small world connectivity, constant maintainence, fairly
-transient connections.  This provides a search ring for layer #2.  The position on the ring is generated from a pubkey,
-and the pubkey must authorize any publication to the channel.
-
-
-
-
-
- */

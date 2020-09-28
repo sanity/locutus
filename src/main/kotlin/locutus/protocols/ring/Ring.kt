@@ -24,7 +24,7 @@ class Ring(private val cm: ConnectionManager, private val gateways: Set<PeerWith
             val joinOrder = gateways.shuffled()
             for (gateway in joinOrder) {
                 cm.addConnection(gateway, true)
-TODO()
+
             }
         }
 
