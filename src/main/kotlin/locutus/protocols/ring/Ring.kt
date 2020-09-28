@@ -24,17 +24,7 @@ class Ring(private val cm: ConnectionManager, private val gateways: Set<PeerWith
             val joinOrder = gateways.shuffled()
             for (gateway in joinOrder) {
                 cm.addConnection(gateway, true)
-                for (response in cm.sendAndWait(gateway.peer, Message.Ring.JoinRequest(cm.myKey.public), maxRetries = 5)) {
-                    when (response) {
-                        is Message.Ring.JoinAccept -> {
-                            myLocation = response.yourLocation
-                        }
-                        is Message.Ring.AcceptJoin -> {
-                            cm.addConnection(response.acceptor, false)
-
-                        }
-                    }
-                }
+TODO()
             }
         }
 

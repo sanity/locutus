@@ -11,33 +11,42 @@ import java.security.interfaces.RSAPublicKey
 @Serializable
 sealed class Message {
 
+    /**
+     * Used for detecting duplicate messages
+     */
     val id = MessageId()
-
-    abstract val respondingTo : MessageId?
 
     object Ring {
         @Serializable
-        class JoinRequest(val myPubKey : RSAPublicKey) : Message() {
-            override val respondingTo: MessageId? = null
-        }
+        class JoinRequest(val myPubKey : RSAPublicKey) : Message(), Initiate
 
         @Serializable
-        class JoinAccept(override val respondingTo: MessageId, val yourLocation : Location) : Message()
+        class JoinAccept( val yourLocation : Location) : Message()
 
         @Serializable
-        class ReferJoin(val joiner : PeerWithKey, val location : Location) : Message() {
-            override val respondingTo: MessageId? = null
-        }
+        class ReferJoin(val joiner : PeerWithKey, val location : Location) : Message()
 
         @Serializable
-        class AcceptJoin(override val respondingTo: MessageId, val acceptor : PeerWithKey) : Message()
+        class AcceptJoin(val acceptor : PeerWithKey) : Message(), Initiate
 
         @Serializable
-        class Join() : Message() {
-            override val respondingTo: MessageId? = null
-        }
+        class Join() : Message(), Initiate
+    }
+
+    object Testing {
+        @Serializable
+        data class FooMessage(val v : Int) : Message()
+
+        @Serializable
+        data class BarMessage(val n : String) : Message()
     }
 }
+
+/**
+ * Marker interface on a message which indicates it is initiating a connection
+ * and cannot be taken as indication that we have the sender's symkey
+ */
+interface Initiate
 
 @Serializable
 data class MessageId(val long : Long = random.nextLong())

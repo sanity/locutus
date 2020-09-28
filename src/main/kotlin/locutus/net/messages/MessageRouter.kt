@@ -2,7 +2,7 @@ package locutus.net.messages
 
 import kotlinx.coroutines.channels.*
 import locutus.net.messages.Message.Ring.JoinRequest
-import locutus.net.messages.MessageRouter.Extractor
+import locutus.net.messages.MessageRouter.*
 import mu.KotlinLogging
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.net.InetSocketAddress
@@ -23,17 +23,8 @@ class MessageRouter {
         extractor: Extractor<MType, KeyType>,
         key: KeyType
     ) : ReceiveChannel<SenderMessage<MType>> {
-        return add(MType::class, extractor, key)
-    }
-
-    @PublishedApi
-    internal fun <MType : Message, KeyType : Any> add(
-        kcls: KClass<MType>,
-        extractor: Extractor<MType, KeyType>,
-        key: KeyType
-    ) : ReceiveChannel<SenderMessage<MType>> {
         val channel : Channel<SenderMessage<MType>> = listeners
-            .computeIfAbsent(kcls) { ConcurrentHashMap() }
+            .computeIfAbsent(MType::class) { ConcurrentHashMap() }
             .computeIfAbsent(extractor.label) { ConcurrentHashMap() }
             .compute(key) { _, existingChannel ->
                 if (existingChannel != null) {
@@ -44,7 +35,7 @@ class MessageRouter {
             } as Channel<SenderMessage<MType>>
         extractors.putIfAbsent(extractor.label, extractor as Extractor<Message, Any>)
         channel.invokeOnClose {
-            listeners[kcls]?.get(extractor.label)?.remove(key)
+            listeners[MType::class]?.get(extractor.label)?.remove(key)
         }
         return channel
     }
@@ -63,12 +54,13 @@ class MessageRouter {
         }
     }
 
-
-    private val listeners = ConcurrentHashMap<KClass<*>,
+    @PublishedApi
+    internal val listeners = ConcurrentHashMap<KClass<*>,
             ConcurrentHashMap<ExtractorLabel,
                     ConcurrentHashMap<KeyType, SendChannel<SenderMessage<Message>>>>>()
 
-    private val extractors = ConcurrentHashMap<String, Extractor<Message, Any>>()
+    @PublishedApi
+    internal val extractors = ConcurrentHashMap<String, Extractor<Message, Any>>()
 }
 
 suspend fun tst() {
