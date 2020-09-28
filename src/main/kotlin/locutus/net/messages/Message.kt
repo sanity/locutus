@@ -1,8 +1,8 @@
-@file:UseSerializers(RSAPublicKeySerializer::class)
 
 package locutus.net.messages
 
 import kotlinx.serialization.*
+import kotlinx.serialization.modules.SerializersModule
 import kweb.util.random
 import locutus.tools.crypto.rsa.*
 import locutus.tools.math.Location
@@ -15,45 +15,28 @@ sealed class Message {
 
     abstract val respondingTo : MessageId?
 
-    /**
-     * Assimilation
-     */
-
-    @Serializable
-    sealed class Assimilate : Message() {
-        /*
-         * Participants
-         *
-         * joiner: The peer that wants to join
-         * gateway: An open peer through which the peer wishes to join, selects a location for the joiner
-         *          and then forwards to peers in the direction of the location
-         *
-         */
-
+    object Ring {
         @Serializable
-        class GatewayRequest(val myPubKey: RSAPublicKey) : Assimilate() {
-
+        class JoinRequest(val myPubKey : RSAPublicKey) : Message() {
             override val respondingTo: MessageId? = null
         }
 
         @Serializable
-        class GatewayAck(override val respondingTo: MessageId, val yourAddress : Peer, val yourLocation : Location) : Assimilate()
+        class JoinAccept(override val respondingTo: MessageId, val yourLocation : Location) : Message()
 
         @Serializable
-        class NewPeer(val joiner : Peer, val joinerPubKey : RSAPublicKey, val location: Location, val connectionsRequired : Int) : Assimilate() {
-            init {
-                require(connectionsRequired < 20)
-            }
-
-
+        class ReferJoin(val joiner : PeerWithKey, val location : Location) : Message() {
             override val respondingTo: MessageId? = null
         }
 
         @Serializable
-        class NewPeerAccept(override val respondingTo: MessageId, val acceptorPeer: Peer, val acceptorPubKey : RSAPublicKey) : Assimilate()
+        class AcceptJoin(override val respondingTo: MessageId, val acceptor : PeerWithKey) : Message()
 
+        @Serializable
+        class Join() : Message() {
+            override val respondingTo: MessageId? = null
+        }
     }
-
 }
 
 @Serializable

@@ -27,6 +27,10 @@ import kotlin.reflect.KClass
 @ExperimentalSerializationApi
 class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: Boolean) {
 
+    companion object {
+        val protoBuf = ProtoBuf { encodeDefaults = false }
+    }
+
     private val logger = KotlinLogging.logger {}
 
     private val connections = ConcurrentHashMap<Peer, Connection>()
@@ -71,7 +75,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
                 val inboundKey = connection.inboundKey
                 requireNotNull(inboundKey) { "Can't decrypt packet without inboundKey" }
                 val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
-                val message = ProtoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
+                val message = protoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
                 handleMessage(connection, message)
 
             } else {
@@ -86,11 +90,10 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
             } else {
                 logger.debug { "Handling message: ${message::class.simpleName}" }
-                message.respondingTo.let { respondingTo ->
-                    if (respondingTo != null) {
-                        logger.trace { "Message is response to ${respondingTo}" }
+                if (message is Message.ReplyMessage) {
+                        logger.trace { "Message is response to ${message.respondingTo}" }
                         if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
-                        val listener = responseListeners.getIfPresent(respondingTo)
+                        val listener = responseListeners.getIfPresent(message.respondingTo)
                             ?: error("No response listener found for reply message $message")
                         listener.send(message)
                     } else {
@@ -102,7 +105,6 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
                             logger.warn { "Received unknown message type ${message::class}, disregarding" }
                         }
                     }
-                }
             }
         }
     }
@@ -112,10 +114,10 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
      * @param isOpen Is [peer] open?
      */
     fun addConnection(
-        peer: Peer,
-        pubKey: RSAPublicKey,
+        peerWithKey : PeerWithKey,
         isOpen: Boolean
     ) {
+        val (peer, pubKey) = peerWithKey
         require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
 
         withLoggingContext("peer" to peer.toString(), "isOpen" to isOpen.toString()) {
@@ -139,7 +141,7 @@ class ConnectionManager(val port: Int, val myKey: RSAKeyPair, private val open: 
         logger.debug { "Sending $message to $to" }
         val connection = connections[to]
         requireNotNull(connection)
-        val serializedMessage = ProtoBuf.encodeToByteArray(Message.serializer(), message)
+        val serializedMessage = protoBuf.encodeToByteArray(Message.serializer(), message)
         val encryptedMessage = connection.outboundKey.encrypt(serializedMessage)
         val keyPrepend: List<ByteArray> =
             if (connection.outboundKeyReceived) {

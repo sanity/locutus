@@ -1,4 +1,4 @@
-package locutus.protocols.unimatrix
+package locutus.protocols.ring
 
 interface Contract<S : Any, C : Contract<S, C>> {
     fun initialSummary() : S

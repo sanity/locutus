@@ -34,10 +34,14 @@ dependencies {
 
     implementation("org.mapdb:mapdb:3.0.8")
 
+    implementation("ch.qos.logback:logback-classic:1.2.3")
+
+    implementation("org.koin:koin-android:2.1.6")
+
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.2.3")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.2.3")
     testImplementation("io.kotest:kotest-property-jvm:4.2.3")
-    implementation("ch.qos.logback:logback-classic:1.2.3")
+
 
 }
 
