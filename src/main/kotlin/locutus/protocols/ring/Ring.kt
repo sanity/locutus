@@ -3,6 +3,7 @@ package locutus.protocols.ring
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.consume
 import kotlinx.serialization.ExperimentalSerializationApi
+import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.*
 import locutus.net.messages.MessageRouter.SenderMessage
@@ -10,7 +11,9 @@ import locutus.tools.math.Location
 import mu.KotlinLogging
 import java.time.Duration
 import java.util.concurrent.ConcurrentSkipListMap
+import kotlin.time.*
 
+@ExperimentalTime
 @ExperimentalSerializationApi
 class Ring(private val cm: ConnectionManager, gateways: Set<PeerWithKey>) {
 
@@ -24,11 +27,14 @@ class Ring(private val cm: ConnectionManager, gateways: Set<PeerWithKey>) {
     private var myLocation: Location? = null
 
     init {
-        scope.launch(Dispatchers.IO) {
-            for ((sender, joinRequest) in cm.listen(Extractors.JoinRequestEx, Unit)) {
-                launch {
-                    handleJoinRequest(sender, joinRequest)
-                }
+        cm.listen(Extractors.JoinRequestEx, Unit, NEVER) {
+            cm.send(sender, Message.Ring.JoinAccept(Location(random.nextDouble())))
+        }
+
+        for (gateway in gateways.toList().shuffled()) {
+            cm.addConnection(gateway)
+            cm.sendReceive(gateway.peer, Message.Ring.JoinRequest(cm.myKey.public), Extractors.JoinAcceptEx, gateway.peer, retries = 5, retryDelay = Duration.ofSeconds(1)) {
+
             }
         }
     }
@@ -41,11 +47,7 @@ class Ring(private val cm: ConnectionManager, gateways: Set<PeerWithKey>) {
     private suspend fun requestJoin(gateway : PeerWithKey) {
         cm.addConnection(gateway)
 
-        cm.listen(Extractors.JoinAcceptEx, gateway.peer).consume {
-            for (joinAccept in this) {
 
-            }
-        }
 
         cm.send(
             gateway.peer,

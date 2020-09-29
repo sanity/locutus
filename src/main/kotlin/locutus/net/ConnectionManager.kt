@@ -1,7 +1,7 @@
 package locutus.net
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -16,6 +16,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.time.Duration
 import java.util.concurrent.*
+import java.util.concurrent.atomic.*
 import kotlin.concurrent.thread
 
 
@@ -118,18 +119,19 @@ class ConnectionManager(
         to: Peer,
         message: Message,
         extractor: MessageRouter.Extractor<MType, KeyType>,
-        key: KeyType
-    ): ReceiveChannel<SenderMessage<MType>> {
-        val messageChannel = router.listen(extractor, key)
+        key: KeyType,
+        timeout: Duration?,
+        noinline block: (MessageReceiver<MType>).() -> Unit
+    ) {
+        router.listen(extractor, key, timeout, block)
         send(to, message)
-        return messageChannel
     }
 
     /**
      * Send a message and listen for a response, this ensures that the response listener
      * is registered before the message is sent to avoid possible race condition.
      *
-     * Will resend the message every [retryDelay] up to [retries] times until [Retryable.confirmReceipt] is called.
+     * Will resend the message every [retryDelay] up to [retries] times until a resposne is received.
      * This shouldn't be a problem as [ConnectionManager] will automatically disregard duplicate messages (determined
      * by their [MessageId].
      */
@@ -138,25 +140,26 @@ class ConnectionManager(
         message: Message,
         extractor: Extractor<MType, KeyType>,
         key: KeyType,
-        retries : Int,
-        retryDelay : Duration
-    ): Retryable<MType> {
-        val retryable = Retryable(sendReceive(to, message, extractor, key))
+        retries: Int,
+        retryDelay: Duration,
+        noinline block: (MessageReceiver<MType>).() -> Unit
+    ) {
+        val responseReceived = AtomicBoolean(false)
+        sendReceive(to, message, extractor, key, retryDelay.multipliedBy(retries.toLong() + 1)) {
+            val xSender = sender
+            val xMessage: MType = message as MType // Not sure why this cast is necessary
+            responseReceived.set(true)
+            block(object : MessageReceiver<MType> {
+                override val sender: Peer = xSender
+                override val message: MType = xMessage
+            })
+        }
         scope.launch(Dispatchers.IO) {
-            for (retryNo in 1 .. retries) {
+            for (retryNo in 1..retries) {
                 delay(retryDelay)
-                if (retryable.receiptConfirmed) break
+                if (responseReceived.get()) break
                 send(to, message)
             }
-        }
-        return retryable
-    }
-
-    data class Retryable<MType : Message> @PublishedApi internal constructor(val channel : ReceiveChannel<SenderMessage<MType>>) {
-        @PublishedApi internal var receiptConfirmed = false
-
-        fun confirmReceipt() {
-            receiptConfirmed = true
         }
     }
 
@@ -165,9 +168,11 @@ class ConnectionManager(
      */
     inline fun <reified MType : Message, KeyType : Any> listen(
         extractor: MessageRouter.Extractor<MType, KeyType>,
-        key: KeyType
-    ): ReceiveChannel<SenderMessage<MType>> {
-        return router.listen(extractor, key)
+        key: KeyType,
+        timeout: Duration?,
+        noinline block: (MessageReceiver<MType>).() -> Unit
+    ) {
+        router.listen(extractor, key, timeout, block)
     }
 
     // TODO: This should be an expiring cache
