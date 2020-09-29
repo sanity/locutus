@@ -16,6 +16,9 @@ sealed class Message {
      */
     val id = MessageId()
 
+    @Serializable
+    class Ack() : Message()
+
     object Ring {
         @Serializable
         class JoinRequest(val myPubKey : RSAPublicKey) : Message(), Initiate

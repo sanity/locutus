@@ -35,6 +35,9 @@ class ConnectionManager(
 
     private val logger = KotlinLogging.logger {}
 
+    @PublishedApi
+    internal val scope = MainScope()
+
     private val connections = ConcurrentHashMap<Peer, Connection>()
 
     @PublishedApi
@@ -55,7 +58,7 @@ class ConnectionManager(
                     val byteArray = ByteArray(buf.remaining())
                     buf.get(byteArray)
                     buf.clear()
-                    GlobalScope.launch(Dispatchers.IO) {
+                    scope.launch(Dispatchers.IO) {
                         handleReceivedPacket(sender, byteArray)
                     }
                 }
@@ -68,13 +71,12 @@ class ConnectionManager(
      * @param isOpen Is [peer] open?
      */
     fun addConnection(
-        peerWithKey: PeerWithKey,
-        isOpen: Boolean
+        peerWithKey: PeerWithKey
     ) {
         val (peer, pubKey) = peerWithKey
         require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
 
-        withLoggingContext("peer" to peer.toString(), "isOpen" to isOpen.toString()) {
+        withLoggingContext("peer" to peer.toString()) {
             logger.info { "Establishing connection to $peer" }
             val outboundKey = AESKey.generate()
             val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
@@ -84,7 +86,7 @@ class ConnectionManager(
                 outboundKeyReceived = false,
                 outboundKey = outboundKey,
                 encryptedOutboundKeyPrefix = encryptedOutboundKey,
-                inboundKey = if (isOpen) InboundKey(outboundKey, null) else null,
+                inboundKey = null,
             )
             connections[peer] = connection
         }
@@ -140,8 +142,7 @@ class ConnectionManager(
         retryDelay : Duration
     ): Retryable<MType> {
         val retryable = Retryable(sendReceive(to, message, extractor, key))
-        // TODO: GlobalScope is evil
-        GlobalScope.launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.IO) {
             for (retryNo in 1 .. retries) {
                 delay(retryDelay)
                 if (retryable.receiptConfirmed) break
@@ -151,7 +152,7 @@ class ConnectionManager(
         return retryable
     }
 
-    class Retryable<MType : Message> @PublishedApi internal constructor(val channel : ReceiveChannel<SenderMessage<MType>>) {
+    data class Retryable<MType : Message> @PublishedApi internal constructor(val channel : ReceiveChannel<SenderMessage<MType>>) {
         @PublishedApi internal var receiptConfirmed = false
 
         fun confirmReceipt() {
