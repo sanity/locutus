@@ -14,6 +14,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.*
 import java.util.concurrent.atomic.*
 import kotlin.concurrent.thread
@@ -31,6 +32,11 @@ class ConnectionManager(
 
     companion object {
         val protoBuf = ProtoBuf { encodeDefaults = false }
+        val pingEvery : Duration = Duration.ofSeconds(30)
+        val dropConnectionAfter : Duration = pingEvery.multipliedBy(10)
+        val keepAliveExtractor = object : Extractor<Message.Keepalive, Unit>("keepAlive") {
+            override fun invoke(p1: SenderMessage<Message.Keepalive>) = Unit
+        }
     }
 
     private val logger = KotlinLogging.logger {}
@@ -39,6 +45,8 @@ class ConnectionManager(
     internal val scope = MainScope()
 
     private val connections = ConcurrentHashMap<Peer, Connection>()
+
+    private val removeConnectionListeners = ConcurrentLinkedQueue<(Peer, String) -> Unit>()
 
     @PublishedApi
     internal val router = MessageRouter()
@@ -49,27 +57,57 @@ class ConnectionManager(
         withLoggingContext("port" to port.toString()) {
             channel.socket().bind(InetSocketAddress(port))
             logger.info { "Listening on UDP port $port" }
-            val buf = ByteBuffer.allocateDirect(Constants.MAX_UDP_PACKET_SIZE + 200)
-            thread {
-                while (true) {
-                    val sender = Peer(channel.receive(buf) as InetSocketAddress)
-                    logger.trace { "Packet received from $sender of length ${buf.remaining()}" }
-                    buf.flip()
-                    val byteArray = ByteArray(buf.remaining())
-                    buf.get(byteArray)
-                    buf.clear()
-                    scope.launch(Dispatchers.IO) {
-                        handleReceivedPacket(sender, byteArray)
+            startListenThread()
+            launchKeepaliveCoroutine()
+            listenForKeepalives()
+        }
+    }
+
+    private fun listenForKeepalives() {
+        listen(keepAliveExtractor, Unit, NEVER) {
+            val connection = connections[sender]
+            if (connection != null) {
+                connection.lastKeepaliveReceived = Instant.now()
+            }
+        }
+    }
+
+    private fun launchKeepaliveCoroutine() {
+        scope.launch(Dispatchers.IO) {
+            while (true) {
+                for ((peer, connection) in connections) {
+                    delay(pingEvery.dividedBy(connections.size.toLong()))
+                    if (connection.lastKeepaliveReceived != null && Duration.between(
+                            connection.lastKeepaliveReceived,
+                            Instant.now()
+                        ) > dropConnectionAfter
+                    ) {
+                        removeConnection(peer, "Time since last keepalive exceeded $dropConnectionAfter")
+                    } else {
+                        send(peer, Message.Keepalive())
                     }
                 }
             }
         }
     }
 
-    /**
-     * @param peer The peer to connect to
-     * @param isOpen Is [peer] open?
-     */
+    private fun startListenThread() {
+        val buf = ByteBuffer.allocateDirect(Constants.MAX_UDP_PACKET_SIZE + 200)
+        thread {
+            while (true) {
+                val sender = Peer(channel.receive(buf) as InetSocketAddress)
+                logger.trace { "Packet received from $sender of length ${buf.remaining()}" }
+                buf.flip()
+                val byteArray = ByteArray(buf.remaining())
+                buf.get(byteArray)
+                buf.clear()
+                scope.launch(Dispatchers.IO) {
+                    handleReceivedPacket(sender, byteArray)
+                }
+            }
+        }
+    }
+
     fun addConnection(
         peerKey: PeerKey
     ) {
@@ -87,10 +125,23 @@ class ConnectionManager(
                 outboundKey = outboundKey,
                 encryptedOutboundKeyPrefix = encryptedOutboundKey,
                 inboundKey = null,
+                lastKeepaliveReceived = null
             )
             connections[peer] = connection
         }
 
+    }
+
+    fun onRemoveConnection(block : (Peer, String) -> Unit) {
+        removeConnectionListeners += block
+    }
+
+    fun removeConnection(peer : Peer, reason : String) {
+        send(peer, Message.Ring.CloseConnection(reason))
+        connections.remove(peer)
+        for (listener in removeConnectionListeners) {
+            listener.invoke(peer, reason)
+        }
     }
 
     fun send(to: Peer, message: Message) {

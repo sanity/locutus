@@ -16,6 +16,9 @@ sealed class Message {
      */
     val id = MessageId()
 
+    @Serializable
+    class Keepalive() : Message()
+
     object Ring {
         @Serializable
         class AssimilateRequest(val assimilatorPublicKey : RSAPublicKey, val assimilatorPeer : Peer?) : Message(), Initiate {

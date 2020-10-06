@@ -12,7 +12,6 @@ import java.time.*
 import java.util.concurrent.atomic.*
 import kotlin.time.ExperimentalTime
 
-@ExperimentalTime
 @ExperimentalSerializationApi
 class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<PeerKey>) {
 
@@ -20,11 +19,17 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
 
     private val logger = KotlinLogging.logger {}
 
-
     @Volatile
     private var ring: Ring? = null
 
     init {
+        cm.onRemoveConnection {peer, reason ->
+            ring.let {ring ->
+                requireNotNull(ring)
+                ring.minusAssign(peer)
+            }
+        }
+
         cm.listen(Extractors.AssimilateRequestExtractor, Unit, NEVER) {
             TODO()
         }
@@ -87,7 +92,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
             }
         }
         scope.launch {
-            val giveUpTime = Instant.now() + Duration.ofSeconds(30)
+            val giveUpTime : Instant = Instant.now() + Duration.ofSeconds(30)
             while (!connectionEstablished.get() && Instant.now() <= giveUpTime) {
                 cm.send(newPeer.peerKey.peer, Message.Ring.OpenConnection(ocReceived.get()))
                 delay(Duration.ofMillis(200))
