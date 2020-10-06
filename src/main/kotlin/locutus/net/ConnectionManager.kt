@@ -1,7 +1,6 @@
 package locutus.net
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -72,9 +71,9 @@ class ConnectionManager(
      * @param isOpen Is [peer] open?
      */
     fun addConnection(
-        peerWithKey: PeerWithKey
+        peerKey: PeerKey
     ) {
-        val (peer, pubKey) = peerWithKey
+        val (peer, pubKey) = peerKey
         require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
 
         withLoggingContext("peer" to peer.toString()) {
@@ -210,7 +209,7 @@ class ConnectionManager(
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
             } else {
                 logger.debug { "Handling message: ${message::class.simpleName}" }
-                if (message !is Initiate) {
+                if (message !is Initiate || !message.hasYourKey) {
                     logger.debug { "Message is response, indicating outboundKey has been received" }
                     if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
                 } else {

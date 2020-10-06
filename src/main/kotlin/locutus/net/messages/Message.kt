@@ -16,24 +16,20 @@ sealed class Message {
      */
     val id = MessageId()
 
-    @Serializable
-    class Ack() : Message()
-
     object Ring {
         @Serializable
-        class JoinRequest(val myPubKey : RSAPublicKey) : Message(), Initiate
+        class AssimilateRequest(val assimilatorPublicKey : RSAPublicKey, val assimilatorPeer : Peer?) : Message(), Initiate {
+            override val hasYourKey = false
+        }
 
         @Serializable
-        class JoinAccept( val yourLocation : Location) : Message()
+        class AssimilateReply(val yourLocation : Location, val yourPeer : Peer?, val acceptedBy : Set<PeerKeyLocation>) : Message()
 
         @Serializable
-        class ReferJoin(val joiner : PeerWithKey, val location : Location) : Message()
+        class OpenConnection(override val hasYourKey: Boolean) : Message(), Initiate
 
         @Serializable
-        class AcceptJoin(val acceptor : PeerWithKey) : Message(), Initiate
-
-        @Serializable
-        class Join() : Message(), Initiate
+        class CloseConnection(val reason : String) : Message()
     }
 
     object Testing {
@@ -47,9 +43,13 @@ sealed class Message {
 
 /**
  * Marker interface on a message which indicates it is initiating a connection
- * and cannot be taken as indication that we have the sender's symkey
+ * and cannot be taken as indication that we have the sender's symkey.  If this
+ * marker is not present, it's assumed that the mesage is a response and the
+ * sender does have our key.
  */
-interface Initiate
+interface Initiate {
+    val hasYourKey : Boolean
+}
 
 @Serializable
 data class MessageId(val long : Long = random.nextLong())

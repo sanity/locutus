@@ -17,9 +17,6 @@ class MessageRouter {
 
     data class SenderMessage<MType : Message>(val sender : Peer, val message : MType)
 
-    /**
-     * Cancelling the ReceiveChannel will result in the removal of the key listener
-     */
     inline fun <reified MType : Message, KeyType : Any> listen(
         extractor: Extractor<MType, KeyType>,
         key: KeyType,
@@ -47,7 +44,7 @@ class MessageRouter {
         }
     }
 
-    suspend fun route(sender : Peer, message : Message) {
+    fun route(sender : Peer, message : Message) {
         val classListeners = listeners[message::class]
         if (classListeners == null) {
             logger.warn("No listener found for message $message")
@@ -57,12 +54,10 @@ class MessageRouter {
             val extractor = extractors[extractorLabel]
             requireNotNull(extractor) { "No extractor found for label $extractorLabel" }
             val receiver = keys[extractor.invoke(SenderMessage(sender, message))]
-            if (receiver != null) {
-                receiver.invoke(object : MessageReceiver<Message> {
-                    override val sender = sender
-                    override val message: Message = message
-                })
-            }
+            receiver?.invoke(object : MessageReceiver<Message> {
+                override val sender = sender
+                override val message: Message = message
+            })
         }
     }
 

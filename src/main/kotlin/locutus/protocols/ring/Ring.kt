@@ -1,70 +1,38 @@
 package locutus.protocols.ring
 
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.consume
-import kotlinx.serialization.ExperimentalSerializationApi
-import kweb.util.random
-import locutus.net.ConnectionManager
+import kweb.state.KVar
 import locutus.net.messages.*
-import locutus.net.messages.MessageRouter.SenderMessage
-import locutus.tools.math.Location
-import mu.KotlinLogging
-import java.time.Duration
-import java.util.concurrent.ConcurrentSkipListMap
-import kotlin.time.*
+import locutus.tools.math.*
+import java.util.*
+import java.util.concurrent.*
 
-@ExperimentalTime
-@ExperimentalSerializationApi
-class Ring(private val cm: ConnectionManager, gateways: Set<PeerWithKey>) {
+class Ring(val myLocation : Location) {
 
-    private val scope = MainScope()
+    val minConnections = KVar(10)
 
-    private val logger = KotlinLogging.logger {}
+    val maxConnections = KVar(20)
 
-    val connections = ConcurrentSkipListMap<Peer, Location>()
-
-    @Volatile
-    private var myLocation: Location? = null
-
-    init {
-        cm.listen(Extractors.JoinRequestEx, Unit, NEVER) {
-            cm.send(sender, Message.Ring.JoinAccept(Location(random.nextDouble())))
-        }
-
-        for (gateway in gateways.toList().shuffled()) {
-            cm.addConnection(gateway)
-            cm.sendReceive(gateway.peer, Message.Ring.JoinRequest(cm.myKey.public), Extractors.JoinAcceptEx, gateway.peer, retries = 5, retryDelay = Duration.ofSeconds(1)) {
-
-            }
+    fun shouldAccept(location : Location) : Boolean {
+        return when {
+            connectionsByLocation.size < minConnections.value -> true
+            connectionsByLocation.size >= maxConnections.value -> false
+            // Placeholder for a smarter algorithm
+            myLocation distance location < avgDistance -> true
+            else -> false
         }
     }
 
-    private suspend fun handleJoinRequest(sender : Peer, joinRequest: Message.Ring.JoinRequest) {
-        cm.addConnection(PeerWithKey(sender, joinRequest.myPubKey))
-
+    operator fun plusAssign(newPeer : PeerKeyLocation) {
+        connectionsByLocation[newPeer.location] = newPeer
     }
 
-    private suspend fun requestJoin(gateway : PeerWithKey) {
-        cm.addConnection(gateway)
+    private val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
 
+    private val avgDistance = connectionsByDistance.keys.average()
 
-
-        cm.send(
-            gateway.peer,
-            Message.Ring.JoinRequest(cm.myKey.public))
-    }
-
-    suspend fun <S : Any, C : Contract<S, C>> search(key: Key<S, C>) {
-
-    }
-
-    object Extractors {
-        object JoinRequestEx : MessageRouter.Extractor<Message.Ring.JoinRequest, Unit>("JoinRequest") {
-            override fun invoke(message: SenderMessage<Message.Ring.JoinRequest>) = Unit
+    private val connectionsByDistance: TreeMap<Double, PeerKeyLocation>
+        get() {
+            return TreeMap(connectionsByLocation.mapKeys { (location, _) ->
+                location.distance(myLocation) })
         }
-
-        object JoinAcceptEx : MessageRouter.Extractor<Message.Ring.JoinAccept, Peer>("joinAccept") {
-            override fun invoke(p1: SenderMessage<Message.Ring.JoinAccept>) = p1.sender
-        }
-    }
 }

@@ -1,6 +1,7 @@
 package locutus.net.messages
 
 import kotlinx.serialization.Serializable
+import locutus.tools.math.Location
 import java.net.*
 import java.security.interfaces.RSAPublicKey
 
@@ -35,4 +36,7 @@ data class Peer(val addr: ByteArray, val port: Int) {
 }
 
 @Serializable
-data class PeerWithKey(val peer: Peer, val key : RSAPublicKey)
+data class PeerKey(val peer: Peer, val key : RSAPublicKey)
+
+@Serializable
+data class PeerKeyLocation(val peerKey: PeerKey, val location : Location)
