@@ -1,22 +1,31 @@
 package locutus.net
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
 import locutus.net.messages.*
-import locutus.net.messages.MessageRouter.*
-import locutus.tools.crypto.*
-import locutus.tools.crypto.rsa.*
-import mu.*
+import locutus.net.messages.MessageRouter.Extractor
+import locutus.net.messages.MessageRouter.SenderMessage
+import locutus.tools.crypto.AESKey
+import locutus.tools.crypto.merge
+import locutus.tools.crypto.rsa.RSAKeyPair
+import locutus.tools.crypto.rsa.encrypt
+import locutus.tools.crypto.startsWith
+import mu.KotlinLogging
+import mu.withLoggingContext
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.*
-import java.util.concurrent.atomic.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 
@@ -55,7 +64,6 @@ class ConnectionManager(
 
     init {
         withLoggingContext("port" to port.toString()) {
-            channel.socket().bind(InetSocketAddress(port))
             logger.info { "Listening on UDP port $port" }
             startListenThread()
             launchKeepaliveCoroutine()
@@ -92,6 +100,7 @@ class ConnectionManager(
     }
 
     private fun startListenThread() {
+        channel.socket().bind(InetSocketAddress(port))
         val buf = ByteBuffer.allocateDirect(Constants.MAX_UDP_PACKET_SIZE + 200)
         thread {
             while (true) {
@@ -231,26 +240,31 @@ class ConnectionManager(
     private suspend fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
         withLoggingContext("sender" to sender.toString()) {
             logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
-            val connection = connections[sender]
-            if (connection != null) {
-                logger.trace { "$sender is connected" }
-                val encryptedPayload = connection.inboundKey.let { inboundKey ->
-                    if (inboundKey?.inboundKeyPrefix != null && rawPacket.startsWith(inboundKey.inboundKeyPrefix)) {
-                        logger.debug { "$sender has prepended AES key although it is already known, disregarding" }
-                        rawPacket.splitPacket().payload
-                    } else {
-                        rawPacket
-                    }
+            val connection : Connection = connections[sender]
+                ?: if (open) {
+                    val c = Connection(sender, null, false, AESKey.generate(), )
+                    connections[sender] = c
+                    c
+                } else {
+                    logger.info { "Disregarding packet from unknown sender $sender" }
+                    return
                 }
-                val inboundKey = connection.inboundKey
+
+            logger.trace { "$sender is connected" }
+            val encryptedPayload = connection.inboundKey.let { inboundKey ->
+                if (inboundKey?.inboundKeyPrefix != null && rawPacket.startsWith(inboundKey.inboundKeyPrefix)) {
+                    logger.debug { "$sender has prepended AES key although it is already known, disregarding" }
+                    rawPacket.splitPacket().payload
+                } else {
+                    rawPacket
+                }
+            }
+            val inboundKey = connection.inboundKey
                 requireNotNull(inboundKey) { "Can't decrypt packet without inboundKey" }
                 val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
                 val message = protoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
                 handleMessage(connection, message)
 
-            } else {
-                logger.debug { "Received message from unknown sender" }
-            }
         }
     }
 
