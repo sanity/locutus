@@ -39,4 +39,7 @@ data class Peer(val addr: ByteArray, val port: Int) {
 data class PeerKey(val peer: Peer, val key : RSAPublicKey)
 
 @Serializable
-data class PeerKeyLocation(val peerKey: PeerKey, val location : Location)
+data class PeerKeyLocation(val peerKey: PeerKey, val location : Location) {
+    constructor(peer : Peer, key : RSAPublicKey, location : Location) :
+            this(PeerKey(peer, key), location)
+}

@@ -21,12 +21,24 @@ sealed class Message {
 
     object Ring {
         @Serializable
-        class AssimilateRequest(val assimilatorPublicKey : RSAPublicKey, val assimilatorPeer : Peer?) : Message(), Initiate {
+        class AssimilateRequest(val type : Type) : Message(), Initiate {
             override val hasYourKey = false
+
+            @Serializable
+            sealed class Type {
+                @Serializable class Initial(val myPublicKey : RSAPublicKey) : Type()
+                @Serializable class Proxy(val toAssimilate : PeerKeyLocation) : Type()
+            }
         }
 
         @Serializable
-        class AssimilateReply(val yourLocation : Location, val yourPeer : Peer?, val acceptedBy : Set<PeerKeyLocation>) : Message()
+        class AssimilateReply(val type : Type, val acceptedBy : Set<PeerKeyLocation>) : Message() {
+            @Serializable
+            sealed class Type {
+                @Serializable class Initial(val yourExternalAddress : Peer, val yourLocation : Location) : Type()
+                @Serializable object Proxy : Type()
+            }
+        }
 
         @Serializable
         class OpenConnection(override val hasYourKey: Boolean) : Message(), Initiate

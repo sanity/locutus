@@ -32,7 +32,6 @@ import kotlin.concurrent.thread
 /**
  * Responsible for securely transmitting [Message]s between [Peer]s.
  */
-@ExperimentalSerializationApi
 class ConnectionManager(
     val port: Int,
     val myKey: RSAKeyPair,
@@ -119,7 +118,7 @@ class ConnectionManager(
 
     fun addConnection(
         peerKey: PeerKey
-    ) {
+    ) : Connection {
         val (peer, pubKey) = peerKey
         require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
 
@@ -137,8 +136,8 @@ class ConnectionManager(
                 lastKeepaliveReceived = null
             )
             connections[peer] = connection
+            return connection
         }
-
     }
 
     fun onRemoveConnection(block : (Peer, String) -> Unit) {
@@ -242,9 +241,10 @@ class ConnectionManager(
             logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
             val connection : Connection = connections[sender]
                 ?: if (open) {
-                    val c = Connection(sender, null, false, AESKey.generate(), )
-                    connections[sender] = c
-                    c
+                    TODO()
+                    //val c = Connection(sender, null, false, AESKey.generate(), )
+                    //connections[sender] = c
+                   // c
                 } else {
                     logger.info { "Disregarding packet from unknown sender $sender" }
                     return

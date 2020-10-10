@@ -3,16 +3,18 @@ package locutus.protocols.ring
 import kotlinx.coroutines.*
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.ExperimentalSerializationApi
+import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.*
 import locutus.net.messages.Message.Ring.AssimilateReply
-import locutus.net.messages.MessageRouter.SenderMessage
+import locutus.net.messages.Message.Ring.AssimilateRequest
+import locutus.net.messages.MessageRouter.*
+import locutus.tools.math.Location
 import mu.KotlinLogging
 import java.time.*
 import java.util.concurrent.atomic.*
 import kotlin.time.ExperimentalTime
 
-@ExperimentalSerializationApi
 class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<PeerKey>) {
 
     private val scope = MainScope()
@@ -22,6 +24,9 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
     @Volatile
     private var ring: Ring? = null
 
+    @Volatile
+    private var myPeerKeyLocation : PeerKeyLocation? = null
+
     init {
         cm.onRemoveConnection {peer, reason ->
             ring.let {ring ->
@@ -30,9 +35,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
             }
         }
 
-        cm.listen(Extractors.AssimilateRequestExtractor, Unit, NEVER) {
-            TODO()
-        }
+        listenForAssimilateRequest()
 
         cm.listen(Extractors.CloseConnectionEx, Unit, NEVER) {
 
@@ -40,6 +43,36 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
 
         beginAssimilation()
 
+    }
+
+    private fun listenForAssimilateRequest() {
+        val assimilateRequestExtractor = object : Extractor<AssimilateRequest, Unit>("JoinRequest") {
+            override fun invoke(message: SenderMessage<AssimilateRequest>) = Unit
+        }
+        cm.listen(assimilateRequestExtractor, Unit, NEVER) {
+            val ring = ring
+            requireNotNull(ring)
+            val myPeerKeyLocation = myPeerKeyLocation
+            requireNotNull(myPeerKeyLocation)
+
+            val peerKeyLocation: PeerKeyLocation
+            val replyType: AssimilateReply.Type
+            when (val type = message.type) {
+                is AssimilateRequest.Type.Initial -> {
+                    peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
+                    replyType = AssimilateReply.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
+                }
+                is AssimilateRequest.Type.Proxy -> {
+                    peerKeyLocation = type.toAssimilate
+                    replyType = AssimilateReply.Type.Proxy
+                }
+            }
+
+            val acceptedBy : Set<PeerKeyLocation>
+            if (ring.shouldAccept(peerKeyLocation.location)) {
+                acceptedBy = setOf(myPeerKeyLocation)
+            }
+        }
     }
 
     suspend fun <S : Any, C : Contract<S, C>> search(key: Key<S, C>) {
@@ -51,23 +84,33 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
             cm.addConnection(gateway)
             cm.sendReceive(
                 to = gateway.peer,
-                message = Message.Ring.AssimilateRequest(cm.myKey.public, null),
+                message = AssimilateRequest(AssimilateRequest.Type.Initial(cm.myKey.public)),
                 extractor = Extractors.JoinAcceptEx,
                 key = gateway.peer,
                 retries = 5,
                 retryDelay = Duration.ofSeconds(1)
             ) {
-                if (ring == null) {
-                    ring = Ring(message.yourLocation)
-                }
-                ring.let { ring ->
-                    requireNotNull(ring)
-                    for (newPeer in message.acceptedBy) {
-                        if (ring.shouldAccept(newPeer.location)) {
-                            scope.launch {
-                                establishConnection(newPeer)
+                when(val type = message.type) {
+                    is AssimilateReply.Type.Initial -> {
+                        if (ring == null) {
+                            ring = Ring(type.yourLocation)
+                        }
+                        if (myPeerKeyLocation == null) {
+                            myPeerKeyLocation = PeerKeyLocation(type.yourExternalAddress, cm.myKey.public, type.yourLocation)
+                        }
+                        ring.let { ring ->
+                            requireNotNull(ring)
+                            for (newPeer in message.acceptedBy) {
+                                if (ring.shouldAccept(newPeer.location)) {
+                                    scope.launch {
+                                        establishConnection(newPeer)
+                                    }
+                                }
                             }
                         }
+                    }
+                    else -> {
+                        logger.warn { "Gateway $gateway responded with incorrect message type $type" }
                     }
                 }
             }
@@ -109,19 +152,17 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
 
 
     object Extractors {
-        object AssimilateRequestExtractor : MessageRouter.Extractor<Message.Ring.AssimilateRequest, Unit>("JoinRequest") {
-            override fun invoke(message: SenderMessage<Message.Ring.AssimilateRequest>) = Unit
-        }
 
-        object JoinAcceptEx : MessageRouter.Extractor<AssimilateReply, Peer>("joinAccept") {
+
+        object JoinAcceptEx : Extractor<AssimilateReply, Peer>("joinAccept") {
             override fun invoke(p1: SenderMessage<AssimilateReply>) = p1.sender
         }
 
-        object OpenConnectionEx : MessageRouter.Extractor<Message.Ring.OpenConnection, Peer>("openConnection") {
+        object OpenConnectionEx : Extractor<Message.Ring.OpenConnection, Peer>("openConnection") {
             override fun invoke(p1: SenderMessage<Message.Ring.OpenConnection>) = p1.sender
         }
 
-        object CloseConnectionEx : MessageRouter.Extractor<Message.Ring.CloseConnection, Unit>("closeConnection") {
+        object CloseConnectionEx : Extractor<Message.Ring.CloseConnection, Unit>("closeConnection") {
             override fun invoke(p1: SenderMessage<Message.Ring.CloseConnection>) = Unit
         }
     }
