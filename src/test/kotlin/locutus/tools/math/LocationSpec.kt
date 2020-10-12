@@ -1,5 +1,6 @@
 package locutus.tools.math
 
+import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.doubles.*
 import io.kotest.matchers.shouldBe
@@ -10,6 +11,7 @@ private val tolerance = 0.000000001
 
 private val logger = KotlinLogging.logger {}
 
+@Order(0)
 @ExperimentalUnsignedTypes
 class LocationSpec : FunSpec({
     test("Distance") {

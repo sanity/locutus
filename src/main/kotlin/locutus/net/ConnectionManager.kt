@@ -311,7 +311,7 @@ class ConnectionManager(
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
             } else {
                 logger.debug { "Handling message: ${message::class.simpleName}" }
-                if (message !is Initiate || !message.hasYourKey) {
+                if (message !is Initiate || !message.isInitiate) {
                     logger.debug { "Message is response, indicating outboundKey has been received" }
                     when (val type = connection.type) {
                         is Connection.Type.Symmetric -> type.outboundKeyReceived = true

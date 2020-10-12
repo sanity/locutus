@@ -1,5 +1,6 @@
 package locutus.tools.crypto.rsa
 
+import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -10,6 +11,7 @@ import java.security.interfaces.RSAPublicKey
 private val logger = KotlinLogging.logger {}
 
 @ExperimentalSerializationApi
+@Order(0)
 class RSAPublicKeySerializerSpec : FunSpec({
     test("serialization") {
         val keyPair = RSAKeyPair.create()

@@ -1,6 +1,7 @@
 package locutus.net.messages
 
 import io.kotest.assertions.timing.eventually
+import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -15,6 +16,7 @@ import java.util.concurrent.*
 import kotlin.time.*
 
 @ExperimentalTime
+@Order(0)
 class MessageRouterSpec : FunSpec({
     context("Given a MessageRouter and an extractor for FooMessage") {
         val messageRouter = MessageRouter()

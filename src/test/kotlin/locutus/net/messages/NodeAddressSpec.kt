@@ -1,5 +1,6 @@
 package locutus.net.messages
 
+import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -7,6 +8,7 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import java.net.InetSocketAddress
 
 @ExperimentalSerializationApi
+@Order(0)
 class NodeAddressSpec : FunSpec({
     test("Serialize and deserialize") {
         val inetSocketAddress = InetSocketAddress("localhost", 1234)

@@ -2,7 +2,6 @@ package locutus.protocols.ring
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.time.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.*
@@ -13,7 +12,6 @@ import locutus.tools.math.Location
 import mu.KotlinLogging
 import java.time.*
 import java.util.concurrent.atomic.*
-import kotlin.time.ExperimentalTime
 
 class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<PeerKey>) {
 
@@ -127,7 +125,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
         val ocReceived = AtomicBoolean(false)
         val connectionEstablished = AtomicBoolean(false)
         cm.listen(Extractors.OpenConnectionEx, newPeer.peerKey.peer, Duration.ofSeconds(30)) {
-            if (message.hasYourKey) {
+            if (message.isInitiate) {
                 ocReceived.set(true)
                 connectionEstablished.set(true)
             } else {

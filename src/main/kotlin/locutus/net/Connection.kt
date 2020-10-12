@@ -25,13 +25,13 @@ class Connection(
                 get() = inboundKey?.aesKey
         }
 
-        data class Outbound(
+        class Outbound(
             val pubKey: RSAPublicKey,
             @Volatile var outboundKeyReceived: Boolean,
             val outboundKey : AESKey,
             val encryptedOutboundKeyPrefix : ByteArray,
         ) : Type() {
-            override val decryptKey: AESKey?
+            override val decryptKey: AESKey
                 get() = outboundKey
 
         }

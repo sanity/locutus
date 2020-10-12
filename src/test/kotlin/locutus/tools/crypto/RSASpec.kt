@@ -1,5 +1,6 @@
 package locutus.tools.crypto
 
+import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
@@ -12,6 +13,7 @@ import java.nio.charset.Charset
 
 @ExperimentalSerializationApi
 @ExperimentalStdlibApi
+@Order(0)
 class RSASpec : FunSpec({
     test("simple encrypt decrypt") {
         val keyPair = RSAKeyPair.create()

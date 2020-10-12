@@ -1,9 +1,11 @@
 package locutus.tools.crypto
 
+import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import locutus.tools.crypto.rsa.*
 
+@Order(0)
 class AESKeySpec : FunSpec({
     test("Create, encrypt and decrypt") {
         val key = AESKey.generate()

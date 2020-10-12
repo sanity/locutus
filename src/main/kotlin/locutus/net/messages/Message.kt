@@ -22,7 +22,7 @@ sealed class Message {
     object Ring {
         @Serializable
         class AssimilateRequest(val type : Type) : Message(), Initiate {
-            override val hasYourKey = false
+            override val isInitiate = false
 
             @Serializable
             sealed class Type {
@@ -41,7 +41,7 @@ sealed class Message {
         }
 
         @Serializable
-        class OpenConnection(override val hasYourKey: Boolean) : Message(), Initiate
+        class OpenConnection(override val isInitiate: Boolean) : Message(), Initiate
 
         @Serializable
         class CloseConnection(val reason : String) : Message()
@@ -49,7 +49,7 @@ sealed class Message {
 
     object Testing {
         @Serializable
-        data class FooMessage(val v : Int, override val hasYourKey: Boolean) : Message(), Initiate
+        data class FooMessage(val v : Int, override val isInitiate: Boolean) : Message(), Initiate
 
         @Serializable
         data class BarMessage(val n : String) : Message()
@@ -63,7 +63,7 @@ sealed class Message {
  * sender does have our key.
  */
 interface Initiate {
-    val hasYourKey : Boolean
+    val isInitiate : Boolean
 }
 
 @Serializable
