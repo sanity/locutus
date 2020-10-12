@@ -8,12 +8,41 @@ import java.time.Instant
 
 class Connection(
     val peer: Peer,
-    val pubKey: RSAPublicKey?,
-    @Volatile var outboundKeyReceived: Boolean,
-    val outboundKey : AESKey,
-    val encryptedOutboundKeyPrefix : ByteArray,
-    @Volatile var inboundKey : InboundKey?,
+    val type : Type,
     @Volatile var lastKeepaliveReceived : Instant?
-)
+) {
+    sealed class Type {
+        abstract val decryptKey : AESKey?
 
-class InboundKey(val aesKey: AESKey, val inboundKeyPrefix: ByteArray?)
+        class Symmetric(
+            val pubKey: RSAPublicKey,
+            @Volatile var outboundKeyReceived: Boolean,
+            val outboundKey : AESKey,
+            val encryptedOutboundKeyPrefix : ByteArray,
+            @Volatile var inboundKey : InboundKey?
+        ) : Type() {
+            override val decryptKey: AESKey?
+                get() = inboundKey?.aesKey
+        }
+
+        data class Outbound(
+            val pubKey: RSAPublicKey,
+            @Volatile var outboundKeyReceived: Boolean,
+            val outboundKey : AESKey,
+            val encryptedOutboundKeyPrefix : ByteArray,
+        ) : Type() {
+            override val decryptKey: AESKey?
+                get() = outboundKey
+
+        }
+
+        class Inbound(
+            @Volatile var inboundKey : InboundKey
+        ) : Type() {
+            override val decryptKey: AESKey?
+                get() = inboundKey.aesKey
+        }
+    }
+}
+
+class InboundKey(val aesKey: AESKey, val encryptedPrefix: ByteArray?)

@@ -1,31 +1,20 @@
 package locutus.net
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.time.delay
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
 import locutus.net.messages.*
-import locutus.net.messages.MessageRouter.Extractor
-import locutus.net.messages.MessageRouter.SenderMessage
-import locutus.tools.crypto.AESKey
-import locutus.tools.crypto.merge
-import locutus.tools.crypto.rsa.RSAKeyPair
-import locutus.tools.crypto.rsa.encrypt
-import locutus.tools.crypto.startsWith
-import mu.KotlinLogging
-import mu.withLoggingContext
+import locutus.net.messages.MessageRouter.*
+import locutus.tools.crypto.*
+import locutus.tools.crypto.rsa.*
+import mu.*
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
-import java.time.Duration
-import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.ConcurrentSkipListSet
-import java.util.concurrent.atomic.AtomicBoolean
+import java.time.*
+import java.util.concurrent.*
+import java.util.concurrent.atomic.*
 import kotlin.concurrent.thread
 
 
@@ -40,8 +29,8 @@ class ConnectionManager(
 
     companion object {
         val protoBuf = ProtoBuf { encodeDefaults = false }
-        val pingEvery : Duration = Duration.ofSeconds(30)
-        val dropConnectionAfter : Duration = pingEvery.multipliedBy(10)
+        val pingEvery: Duration = Duration.ofSeconds(30)
+        val dropConnectionAfter: Duration = pingEvery.multipliedBy(10)
         val keepAliveExtractor = object : Extractor<Message.Keepalive, Unit>("keepAlive") {
             override fun invoke(p1: SenderMessage<Message.Keepalive>) = Unit
         }
@@ -104,7 +93,7 @@ class ConnectionManager(
         thread {
             while (true) {
                 val sender = Peer(channel.receive(buf) as InetSocketAddress)
-                logger.trace { "Packet received from $sender of length ${buf.remaining()}" }
+                logger.debug { "Packet received from $sender of length ${buf.remaining()}" }
                 buf.flip()
                 val byteArray = ByteArray(buf.remaining())
                 buf.get(byteArray)
@@ -117,34 +106,35 @@ class ConnectionManager(
     }
 
     fun addConnection(
-        peerKey: PeerKey
-    ) : Connection {
+        peerKey: PeerKey,
+        unsolicited: Boolean
+    ): Connection {
         val (peer, pubKey) = peerKey
         require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
 
         withLoggingContext("peer" to peer.toString()) {
-            logger.info { "Establishing connection to $peer" }
+            logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
             val outboundKey = AESKey.generate()
             val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
-            val connection = Connection(
-                peer = peer,
-                pubKey = pubKey,
-                outboundKeyReceived = false,
-                outboundKey = outboundKey,
-                encryptedOutboundKeyPrefix = encryptedOutboundKey,
-                inboundKey = null,
-                lastKeepaliveReceived = null
-            )
+            val type = when (unsolicited) {
+                true -> {
+                    Connection.Type.Outbound(pubKey, false, outboundKey, encryptedOutboundKey)
+                }
+                false -> {
+                    Connection.Type.Symmetric(pubKey, false, outboundKey, encryptedOutboundKey, null)
+                }
+            }
+            val connection = Connection(peer, type, null)
             connections[peer] = connection
             return connection
         }
     }
 
-    fun onRemoveConnection(block : (Peer, String) -> Unit) {
+    fun onRemoveConnection(block: (Peer, String) -> Unit) {
         removeConnectionListeners += block
     }
 
-    fun removeConnection(peer : Peer, reason : String) {
+    fun removeConnection(peer: Peer, reason: String) {
         send(peer, Message.Ring.CloseConnection(reason))
         connections.remove(peer)
         for (listener in removeConnectionListeners) {
@@ -157,16 +147,32 @@ class ConnectionManager(
         val connection = connections[to]
         requireNotNull(connection)
         val serializedMessage = protoBuf.encodeToByteArray(Message.serializer(), message)
-        val encryptedMessage = connection.outboundKey.encrypt(serializedMessage)
-        val keyPrepend: List<ByteArray> =
-            if (connection.outboundKeyReceived) {
-                emptyList()
-            } else {
-                listOf(connection.encryptedOutboundKeyPrefix)
+        connection.type.let { connectionType ->
+            val symKey: AESKey = when (connectionType) {
+                is Connection.Type.Symmetric -> connectionType.outboundKey
+                is Connection.Type.Outbound -> connectionType.outboundKey
+                is Connection.Type.Inbound -> connectionType.inboundKey.aesKey
             }
-        val outboundRaw = (keyPrepend + encryptedMessage).merge()
-        logger.trace { "Sending ${outboundRaw.size}b message to $to" }
-        channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
+
+            val encryptedMessage = symKey.encrypt(serializedMessage)
+            val keyPrepend: List<ByteArray> = when (val type = connection.type) {
+                is Connection.Type.Symmetric -> if (type.outboundKeyReceived) {
+                    emptyList()
+                } else {
+                    listOf(type.encryptedOutboundKeyPrefix)
+                }
+                is Connection.Type.Outbound -> if (type.outboundKeyReceived) {
+                    emptyList()
+                } else {
+                    listOf(type.encryptedOutboundKeyPrefix)
+                }
+                is Connection.Type.Inbound -> emptyList()
+            }
+
+            val outboundRaw = (keyPrepend + encryptedMessage).merge()
+            logger.debug { "Sending ${outboundRaw.size}b message to $to" }
+            channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
+        }
     }
 
     /**
@@ -236,39 +242,70 @@ class ConnectionManager(
     // TODO: This should be an expiring cache
     private val receivedMessageIds = ConcurrentSkipListSet<MessageId>()
 
-    private suspend fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
+    private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
         withLoggingContext("sender" to sender.toString()) {
             logger.debug { "packetReceived($sender, ${rawPacket.size} bytes)" }
-            val connection : Connection = connections[sender]
-                ?: if (open) {
-                    TODO()
-                    //val c = Connection(sender, null, false, AESKey.generate(), )
-                    //connections[sender] = c
-                   // c
-                } else {
-                    logger.info { "Disregarding packet from unknown sender $sender" }
-                    return
+
+            var connection: Connection? = connections[sender]
+
+            val knownSymKeyPrefix: ByteArray? = if (connection != null) when (val type = connection.type) {
+                is Connection.Type.Symmetric -> type.inboundKey?.encryptedPrefix
+                is Connection.Type.Outbound -> null
+                is Connection.Type.Inbound -> type.inboundKey.encryptedPrefix
+            } else null
+
+            val decryptedPayload: ByteArray = when {
+
+                connection == null -> {
+                    logger.debug { "Packet received from unknown sender" }
+                    if (!open) {
+                        logger.warn("Disregarding packet from unknown sender because I'm not open")
+                        return
+                    }
+                    logger.debug { "Packet received from unknown sender, assume its prepended, extract and use" }
+                    val splitPacket = rawPacket.splitPacket()
+                    val symKey = AESKey(myKey.private.decrypt(RSAEncrypted(splitPacket.encryptedAESKey)))
+                    val inboundType = Connection.Type.Inbound(InboundKey(symKey, splitPacket.encryptedAESKey))
+                    connection = Connection(sender, inboundType, null)
+                    connections[sender] = connection
+                    symKey.decrypt(splitPacket.payload)
                 }
 
-            logger.trace { "$sender is connected" }
-            val encryptedPayload = connection.inboundKey.let { inboundKey ->
-                if (inboundKey?.inboundKeyPrefix != null && rawPacket.startsWith(inboundKey.inboundKeyPrefix)) {
-                    logger.debug { "$sender has prepended AES key although it is already known, disregarding" }
-                    rawPacket.splitPacket().payload
-                } else {
-                    rawPacket
+                knownSymKeyPrefix != null && rawPacket.startsWith(knownSymKeyPrefix) -> {
+                    logger.debug { "Packet has prepended symkey, but we've already received it" }
+                    connection.type.decryptKey?.decrypt(rawPacket.splitPacket().payload)
+                        ?: error("knownSymKeyPrefix != null but connection.type.decryptKey is null, this shouldn't happen")
                 }
+
+                connection.type.decryptKey == null -> {
+                    logger.debug { "Packet received, decrypt key unknown, assume its prepended and parse it" }
+                    val splitPacket = rawPacket.splitPacket()
+                    val symKey = AESKey(myKey.private.decrypt(RSAEncrypted(splitPacket.encryptedAESKey)))
+                    when (val type = connection.type) {
+                        is Connection.Type.Symmetric -> {
+                            type.inboundKey = InboundKey(symKey, splitPacket.encryptedAESKey)
+                            symKey.decrypt(splitPacket.payload)
+                        }
+                        else -> error("Packet received, decrypt key unknown but connection is known, but connection type isn't Symmetric, it is ${connection.type::class.simpleName}")
+                    }
+                }
+
+                connection.type.decryptKey != null -> {
+                    logger.debug { "Packet received, decrypt key is known and isn't prepended, assume entire packet is payload" }
+                    connection.type.decryptKey?.decrypt(rawPacket)
+                        ?: error("connection.type.decryptKey shouldn't be null")
+                }
+
+                else -> error("Unhandled condition while decrypting payload")
             }
-            val inboundKey = connection.inboundKey
-                requireNotNull(inboundKey) { "Can't decrypt packet without inboundKey" }
-                val decryptedPayload = inboundKey.aesKey.decrypt(encryptedPayload)
-                val message = protoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
-                handleMessage(connection, message)
+
+            val message = protoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
+            handleMessage(connection, message)
 
         }
     }
 
-    private suspend fun handleMessage(connection: Connection, message: Message) {
+    private fun handleMessage(connection: Connection, message: Message) {
         withLoggingContext("sender" to connection.peer.toString(), "message" to message::class.toString()) {
             if (message.id in receivedMessageIds) {
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
@@ -276,7 +313,10 @@ class ConnectionManager(
                 logger.debug { "Handling message: ${message::class.simpleName}" }
                 if (message !is Initiate || !message.hasYourKey) {
                     logger.debug { "Message is response, indicating outboundKey has been received" }
-                    if (!connection.outboundKeyReceived) connection.outboundKeyReceived = true
+                    when (val type = connection.type) {
+                        is Connection.Type.Symmetric -> type.outboundKeyReceived = true
+                        is Connection.Type.Outbound -> type.outboundKeyReceived = true
+                    }
                 } else {
                     logger.debug { "Message is not response" }
                 }
@@ -288,8 +328,11 @@ class ConnectionManager(
 
 }
 
-private class SplitPacket(val decryptKey: ByteArray, val payload: ByteArray)
+private class SplitPacket(val encryptedAESKey: ByteArray, val payload: ByteArray)
 
 private fun ByteArray.splitPacket(): SplitPacket {
-    return SplitPacket(this.copyOf(AESKey.RSA_ENCRYPTED_SIZE), this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size))
+    return SplitPacket(
+        this.copyOf(AESKey.RSA_ENCRYPTED_SIZE),
+        this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size)
+    )
 }

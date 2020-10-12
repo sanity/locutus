@@ -81,7 +81,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
 
     private fun beginAssimilation() {
         for (gateway in gateways.toList().shuffled()) {
-            cm.addConnection(gateway)
+            cm.addConnection(gateway, true)
             cm.sendReceive(
                 to = gateway.peer,
                 message = AssimilateRequest(AssimilateRequest.Type.Initial(cm.myKey.public)),
@@ -123,7 +123,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
      * sending.
      */
     private suspend fun establishConnection(newPeer : PeerKeyLocation) {
-        cm.addConnection(newPeer.peerKey)
+        cm.addConnection(newPeer.peerKey, false)
         val ocReceived = AtomicBoolean(false)
         val connectionEstablished = AtomicBoolean(false)
         cm.listen(Extractors.OpenConnectionEx, newPeer.peerKey.peer, Duration.ofSeconds(30)) {

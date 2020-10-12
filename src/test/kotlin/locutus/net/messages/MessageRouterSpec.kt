@@ -45,16 +45,16 @@ class MessageRouterSpec : FunSpec({
             }
 
             test("FooMessage(2) should be ignored") {
-                messageRouter.route(sender, FooMessage(2))
+                messageRouter.route(sender, FooMessage(2, false))
                 eventually(100.milliseconds) {
                     fooReceived.isEmpty() shouldBe true
                 }
             }
 
             test("FooMessage(1) should be added to fooReceived") {
-                messageRouter.route(sender, FooMessage(1))
+                messageRouter.route(sender, FooMessage(1, false))
                 eventually(100.milliseconds) {
-                    fooReceived shouldContainExactly listOf(SenderMessage(sender, FooMessage(1)))
+                    fooReceived shouldContainExactly listOf(SenderMessage(sender, FooMessage(1, false)))
                 }
             }
 

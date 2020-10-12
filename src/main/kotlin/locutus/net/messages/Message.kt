@@ -49,7 +49,7 @@ sealed class Message {
 
     object Testing {
         @Serializable
-        data class FooMessage(val v : Int) : Message()
+        data class FooMessage(val v : Int, override val hasYourKey: Boolean) : Message(), Initiate
 
         @Serializable
         data class BarMessage(val n : String) : Message()
