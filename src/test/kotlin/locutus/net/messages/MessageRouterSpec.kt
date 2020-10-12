@@ -17,9 +17,7 @@ import kotlin.time.*
 class MessageRouterSpec : FunSpec({
     context("Given a MessageRouter and an extractor for FooMessage") {
         val messageRouter = MessageRouter()
-        val fooExtractor = object : Extractor<FooMessage, Int>("fooExtractor") {
-            override fun invoke(p1: SenderMessage<FooMessage>) = p1.message.v
-        }
+        val fooExtractor = Extractor<FooMessage, Int>("fooExtractor") { message.v }
 
         val fooReceived = ConcurrentLinkedQueue<SenderMessage<FooMessage>>()
 

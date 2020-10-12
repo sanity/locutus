@@ -39,7 +39,7 @@ class RingProtocol(
 
         listenForAssimilateRequest()
 
-        cm.listen(Extractors.CloseConnectionEx, Unit, NEVER) {
+        cm.listen(Extractors.closeConnection, Unit, NEVER) {
             TODO()
         }
 
@@ -48,9 +48,7 @@ class RingProtocol(
     }
 
     private fun listenForAssimilateRequest() {
-        val assimilateRequestExtractor = object : Extractor<JoinRequest, Unit>("JoinRequest") {
-            override fun invoke(message: SenderMessage<JoinRequest>) = Unit
-        }
+        val assimilateRequestExtractor = Extractor<JoinRequest, Unit>("JoinRequest") { Unit }
         cm.listen(assimilateRequestExtractor, Unit, NEVER) {
             val ring = ring
             requireNotNull(ring)
@@ -128,7 +126,7 @@ class RingProtocol(
         cm.addConnection(newPeer.peerKey, false)
         val ocReceived = AtomicBoolean(false)
         val connectionEstablished = AtomicBoolean(false)
-        cm.listen(Extractors.OpenConnectionEx, newPeer.peerKey.peer, Duration.ofSeconds(30)) {
+        cm.listen(Extractors.openConnection, newPeer.peerKey.peer, Duration.ofSeconds(30)) {
             if (message.isInitiate) {
                 ocReceived.set(true)
                 connectionEstablished.set(true)
@@ -155,14 +153,10 @@ class RingProtocol(
 
     object Extractors {
 
-        val joinAccept = Extractor.create<JoinResponse, Peer>("joinAccept") { sender }
+        val joinAccept = Extractor<JoinResponse, Peer>("joinAccept") { sender }
 
-        object OpenConnectionEx : Extractor<Message.Ring.OpenConnection, Peer>("openConnection") {
-            override fun invoke(p1: SenderMessage<Message.Ring.OpenConnection>) = p1.sender
-        }
+        val openConnection = Extractor<Message.Ring.OpenConnection, Peer>("openConnection") { sender }
 
-        object CloseConnectionEx : Extractor<Message.Ring.CloseConnection, Unit>("closeConnection") {
-            override fun invoke(p1: SenderMessage<Message.Ring.CloseConnection>) = Unit
-        }
+        val closeConnection = Extractor<Message.Ring.CloseConnection, Unit>("closeConnection") { Unit }
     }
 }

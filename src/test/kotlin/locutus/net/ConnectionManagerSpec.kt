@@ -6,6 +6,8 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.ExperimentalSerializationApi
 import locutus.net.messages.*
+import locutus.net.messages.Message.Testing.BarMessage
+import locutus.net.messages.Message.Testing.FooMessage
 import locutus.tools.crypto.rsa.RSAKeyPair
 import java.net.InetSocketAddress
 import java.time.Duration
@@ -26,39 +28,45 @@ class ConnectionManagerSpec : FunSpec({
         cm2.addConnection(PeerKey(peer1, cm1.myKey.public), false)
         test("Send a FooMesage from peer1 to peer2 which is an initiate message") {
             val fooReceived = AtomicBoolean(false)
-            cm2.listen(object : Extractor<Message.Testing.FooMessage, Peer>("fooExtractor") {
-                override fun invoke(p1: MessageRouter.SenderMessage<Message.Testing.FooMessage>): Peer = p1.sender
-            }, peer1, Duration.ofMillis(500)) {
+            cm2.listen(
+                    Extractor<FooMessage, Peer>("fooExtractor") { sender },
+                    peer1,
+                    Duration.ofMillis(500)
+            ) {
                 message.v shouldBe 12
                 fooReceived.set(true)
             }
-            cm1.send(peer2, Message.Testing.FooMessage(12, true))
+            cm1.send(peer2, FooMessage(12, true))
             eventually(1.seconds) {
                 fooReceived.get() shouldBe true
             }
         }
         test("Peer2 responds with a BarMessage which is not an initiate message") {
             val barReceived = AtomicBoolean(false)
-            cm1.listen(object : Extractor<Message.Testing.BarMessage, Peer>("barExtractor") {
-                override fun invoke(p1: MessageRouter.SenderMessage<Message.Testing.BarMessage>): Peer = p1.sender
-            }, key = peer2, timeout = Duration.ofMillis(500)) {
+            cm1.listen(
+                    Extractor<BarMessage, Peer>("barExtractor") { sender },
+                    key = peer2,
+                    timeout = Duration.ofMillis(500)
+            ) {
                 message.n shouldBe "hello"
                 barReceived.set(true)
             }
-            cm2.send(peer1, Message.Testing.BarMessage("hello"))
+            cm2.send(peer1, BarMessage("hello"))
             eventually(1.seconds) {
                 barReceived.get() shouldBe true
             }
         }
         test("Peer 1 sends another FooMessage") {
             val fooReceived = AtomicBoolean(false)
-            cm2.listen(object : Extractor<Message.Testing.FooMessage, Peer>("fooExtractor") {
-                override fun invoke(p1: MessageRouter.SenderMessage<Message.Testing.FooMessage>): Peer = p1.sender
-            }, peer1, Duration.ofMillis(500)) {
+            cm2.listen(
+                    Extractor<FooMessage, Peer>("fooExtractor") { sender },
+                    peer1,
+                    Duration.ofMillis(500)
+            ) {
                 message.v shouldBe 56
                 fooReceived.set(true)
             }
-            cm1.send(peer2, Message.Testing.FooMessage(56, true))
+            cm1.send(peer2, FooMessage(56, true))
             eventually(1.seconds) {
                 fooReceived.get() shouldBe true
             }
@@ -71,42 +79,40 @@ class ConnectionManagerSpec : FunSpec({
         val peer2 = Peer(InetSocketAddress("localhost", cm2.port))
         cm1.addConnection(PeerKey(peer2, cm2.myKey.public), unsolicited = true)
         val peer1 = Peer(InetSocketAddress("localhost", cm1.port))
-       // cm2.addConnection(PeerKey(peer1, cm1.myKey.public), false)
+        // cm2.addConnection(PeerKey(peer1, cm1.myKey.public), false)
         test("Send a FooMesage from peer1 to peer2 which is an initiate message") {
             val fooReceived = AtomicBoolean(false)
-            cm2.listen(object : Extractor<Message.Testing.FooMessage, Peer>("fooExtractor") {
-                override fun invoke(p1: MessageRouter.SenderMessage<Message.Testing.FooMessage>): Peer = p1.sender
-            }, peer1, Duration.ofMillis(500)) {
+            cm2.listen(Extractor<FooMessage, Peer>("fooExtractor") { sender }, peer1, Duration.ofMillis(500)) {
                 message.v shouldBe 12
                 fooReceived.set(true)
             }
-            cm1.send(peer2, Message.Testing.FooMessage(12, true))
+            cm1.send(peer2, FooMessage(12, true))
             eventually(1.seconds) {
                 fooReceived.get() shouldBe true
             }
         }
         test("Peer2 responds with a BarMessage which is not an initiate message") {
             val barReceived = AtomicBoolean(false)
-            cm1.listen(object : Extractor<Message.Testing.BarMessage, Peer>("barExtractor") {
-                override fun invoke(p1: MessageRouter.SenderMessage<Message.Testing.BarMessage>): Peer = p1.sender
-            }, key = peer2, timeout = Duration.ofMillis(500)) {
+            cm1.listen(Extractor<BarMessage, Peer>("barExtractor") { sender  }, key = peer2, timeout = Duration.ofMillis(500)) {
                 message.n shouldBe "hello"
                 barReceived.set(true)
             }
-            cm2.send(peer1, Message.Testing.BarMessage("hello"))
+            cm2.send(peer1, BarMessage("hello"))
             eventually(1.seconds) {
                 barReceived.get() shouldBe true
             }
         }
         test("Peer 1 sends another FooMessage") {
             val fooReceived = AtomicBoolean(false)
-            cm2.listen(object : Extractor<Message.Testing.FooMessage, Peer>("fooExtractor") {
-                override fun invoke(p1: MessageRouter.SenderMessage<Message.Testing.FooMessage>): Peer = p1.sender
-            }, peer1, Duration.ofMillis(500)) {
+            cm2.listen(
+                    Extractor<FooMessage, Peer>("fooExtractor") { sender },
+                    peer1,
+                    Duration.ofMillis(500)
+            ) {
                 message.v shouldBe 56
                 fooReceived.set(true)
             }
-            cm1.send(peer2, Message.Testing.FooMessage(56, true))
+            cm1.send(peer2, FooMessage(56, true))
             eventually(1.seconds) {
                 fooReceived.get() shouldBe true
             }

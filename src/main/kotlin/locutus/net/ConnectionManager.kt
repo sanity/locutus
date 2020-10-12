@@ -31,9 +31,7 @@ class ConnectionManager(
         val protoBuf = ProtoBuf { encodeDefaults = false }
         val pingEvery: Duration = Duration.ofSeconds(30)
         val dropConnectionAfter: Duration = pingEvery.multipliedBy(10)
-        val keepAliveExtractor = object : Extractor<Message.Keepalive, Unit>("keepAlive") {
-            override fun invoke(p1: SenderMessage<Message.Keepalive>) = Unit
-        }
+        val keepAliveExtractor = Extractor<Message.Keepalive, Unit>("keepAlive") {Unit}
     }
 
     private val logger = KotlinLogging.logger {}
