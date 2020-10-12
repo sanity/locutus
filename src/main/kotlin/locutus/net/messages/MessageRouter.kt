@@ -13,15 +13,13 @@ class MessageRouter {
 
     @PublishedApi internal val scope = MainScope()
 
-    abstract class Extractor<MType : Message, KeyType : Any>(val label : String) : (SenderMessage<MType>) -> KeyType
-
     data class SenderMessage<MType : Message>(val sender : Peer, val message : MType)
 
     inline fun <reified MType : Message, KeyType : Any> listen(
-        extractor: Extractor<MType, KeyType>,
-        key: KeyType,
-        timeout : Duration?,
-        noinline block : (MessageReceiver<MType>).() -> Unit
+            extractor: Extractor<MType, KeyType>,
+            key: KeyType,
+            timeout : Duration?,
+            noinline block : (MessageReceiver<MType>).() -> Unit
     ) {
         listeners
             .computeIfAbsent(MType::class) { ConcurrentHashMap() }

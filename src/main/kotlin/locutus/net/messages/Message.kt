@@ -21,7 +21,7 @@ sealed class Message {
 
     object Ring {
         @Serializable
-        class AssimilateRequest(val type : Type) : Message(), Initiate {
+        class JoinRequest(val type : Type, val hopsToLive : Int) : Message(), Initiate {
             override val isInitiate = false
 
             @Serializable
@@ -32,7 +32,7 @@ sealed class Message {
         }
 
         @Serializable
-        class AssimilateReply(val type : Type, val acceptedBy : Set<PeerKeyLocation>) : Message() {
+        class JoinResponse(val type : Type, val acceptedBy : Set<PeerKeyLocation>) : Message() {
             @Serializable
             sealed class Type {
                 @Serializable class Initial(val yourExternalAddress : Peer, val yourLocation : Location) : Type()

@@ -180,12 +180,12 @@ class ConnectionManager(
      * is registered before the message is sent to avoid possible race condition.
      */
     inline fun <reified MType : Message, KeyType : Any> sendReceive(
-        to: Peer,
-        message: Message,
-        extractor: MessageRouter.Extractor<MType, KeyType>,
-        key: KeyType,
-        timeout: Duration?,
-        noinline block: (MessageReceiver<MType>).() -> Unit
+            to: Peer,
+            message: Message,
+            extractor: Extractor<MType, KeyType>,
+            key: KeyType,
+            timeout: Duration?,
+            noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
         router.listen(extractor, key, timeout, block)
         send(to, message)
@@ -200,13 +200,13 @@ class ConnectionManager(
      * by their [MessageId].
      */
     inline fun <reified MType : Message, KeyType : Any> sendReceive(
-        to: Peer,
-        message: Message,
-        extractor: Extractor<MType, KeyType>,
-        key: KeyType,
-        retries: Int,
-        retryDelay: Duration,
-        noinline block: (MessageReceiver<MType>).() -> Unit
+            to: Peer,
+            message: Message,
+            extractor: Extractor<MType, KeyType>,
+            key: KeyType,
+            retries: Int,
+            retryDelay: Duration,
+            noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
         val responseReceived = AtomicBoolean(false)
         sendReceive(to, message, extractor, key, retryDelay.multipliedBy(retries.toLong() + 1)) {
@@ -231,10 +231,10 @@ class ConnectionManager(
      * Listen for incoming messages, see [MessageRouter.listen]
      */
     inline fun <reified MType : Message, KeyType : Any> listen(
-        extractor: MessageRouter.Extractor<MType, KeyType>,
-        key: KeyType,
-        timeout: Duration?,
-        noinline block: (MessageReceiver<MType>).() -> Unit
+            extractor: Extractor<MType, KeyType>,
+            key: KeyType,
+            timeout: Duration?,
+            noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
         router.listen(extractor, key, timeout, block)
     }

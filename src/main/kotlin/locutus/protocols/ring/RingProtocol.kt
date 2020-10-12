@@ -5,15 +5,19 @@ import kotlinx.coroutines.time.delay
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.*
-import locutus.net.messages.Message.Ring.AssimilateReply
-import locutus.net.messages.Message.Ring.AssimilateRequest
+import locutus.net.messages.Message.Ring.JoinResponse
+import locutus.net.messages.Message.Ring.JoinRequest
 import locutus.net.messages.MessageRouter.*
 import locutus.tools.math.Location
 import mu.KotlinLogging
 import java.time.*
 import java.util.concurrent.atomic.*
 
-class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<PeerKey>) {
+class RingProtocol(
+        private val cm: ConnectionManager,
+        private val gateways: Set<PeerKey>,
+        private val maxHopsToLive : Int = 10
+) {
 
     private val scope = MainScope()
 
@@ -36,7 +40,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
         listenForAssimilateRequest()
 
         cm.listen(Extractors.CloseConnectionEx, Unit, NEVER) {
-
+            TODO()
         }
 
         beginAssimilation()
@@ -44,8 +48,8 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
     }
 
     private fun listenForAssimilateRequest() {
-        val assimilateRequestExtractor = object : Extractor<AssimilateRequest, Unit>("JoinRequest") {
-            override fun invoke(message: SenderMessage<AssimilateRequest>) = Unit
+        val assimilateRequestExtractor = object : Extractor<JoinRequest, Unit>("JoinRequest") {
+            override fun invoke(message: SenderMessage<JoinRequest>) = Unit
         }
         cm.listen(assimilateRequestExtractor, Unit, NEVER) {
             val ring = ring
@@ -54,15 +58,15 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
             requireNotNull(myPeerKeyLocation)
 
             val peerKeyLocation: PeerKeyLocation
-            val replyType: AssimilateReply.Type
+            val replyType: JoinResponse.Type
             when (val type = message.type) {
-                is AssimilateRequest.Type.Initial -> {
+                is JoinRequest.Type.Initial -> {
                     peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
-                    replyType = AssimilateReply.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
+                    replyType = JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
                 }
-                is AssimilateRequest.Type.Proxy -> {
+                is JoinRequest.Type.Proxy -> {
                     peerKeyLocation = type.toAssimilate
-                    replyType = AssimilateReply.Type.Proxy
+                    replyType = JoinResponse.Type.Proxy
                 }
             }
 
@@ -82,14 +86,14 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
             cm.addConnection(gateway, true)
             cm.sendReceive(
                 to = gateway.peer,
-                message = AssimilateRequest(AssimilateRequest.Type.Initial(cm.myKey.public)),
-                extractor = Extractors.JoinAcceptEx,
+                message = JoinRequest(JoinRequest.Type.Initial(cm.myKey.public), maxHopsToLive),
+                extractor = Extractors.joinAccept,
                 key = gateway.peer,
                 retries = 5,
                 retryDelay = Duration.ofSeconds(1)
             ) {
                 when(val type = message.type) {
-                    is AssimilateReply.Type.Initial -> {
+                    is JoinResponse.Type.Initial -> {
                         if (ring == null) {
                             ring = Ring(type.yourLocation)
                         }
@@ -151,10 +155,7 @@ class RingProtocol(private val cm: ConnectionManager, private val gateways: Set<
 
     object Extractors {
 
-
-        object JoinAcceptEx : Extractor<AssimilateReply, Peer>("joinAccept") {
-            override fun invoke(p1: SenderMessage<AssimilateReply>) = p1.sender
-        }
+        val joinAccept = Extractor.create<JoinResponse, Peer>("joinAccept") { sender }
 
         object OpenConnectionEx : Extractor<Message.Ring.OpenConnection, Peer>("openConnection") {
             override fun invoke(p1: SenderMessage<Message.Ring.OpenConnection>) = p1.sender

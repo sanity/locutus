@@ -5,13 +5,10 @@ import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.channels.consume
-import kotlinx.coroutines.launch
 import locutus.net.messages.Message.Testing.BarMessage
 import locutus.net.messages.Message.Testing.FooMessage
 import locutus.net.messages.MessageRouter.*
 import java.net.*
-import java.time.Duration
 import java.util.concurrent.*
 import kotlin.time.*
 
