@@ -5,7 +5,6 @@ import kotlinx.coroutines.time.delay
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
 import locutus.net.messages.*
-import locutus.net.messages.MessageRouter.*
 import locutus.tools.crypto.*
 import locutus.tools.crypto.rsa.*
 import mu.*
@@ -229,12 +228,12 @@ class ConnectionManager(
      * Listen for incoming messages, see [MessageRouter.listen]
      */
     inline fun <reified MType : Message, KeyType : Any> listen(
-            extractor: Extractor<MType, KeyType>,
+            for_: Extractor<MType, KeyType>,
             key: KeyType,
             timeout: Duration?,
             noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
-        router.listen(extractor, key, timeout, block)
+        router.listen(for_, key, timeout, block)
     }
 
     // TODO: This should be an expiring cache

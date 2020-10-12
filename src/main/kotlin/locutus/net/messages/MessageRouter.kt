@@ -19,25 +19,25 @@ class MessageRouter {
     data class SenderMessage<MType : Message>(val sender: Peer, val message: MType)
 
     inline fun <reified MType : Message, KeyType : Any> listen(
-            extractor: Extractor<MType, KeyType>,
+            for_: Extractor<MType, KeyType>,
             key: KeyType,
             timeout: Duration?,
             noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
         listeners
                 .computeIfAbsent(MType::class) { ConcurrentHashMap() }
-                .computeIfAbsent(extractor.label) { ConcurrentHashMap() }[key] = block as MessageReceiver<*>.() -> Unit
-        extractors.putIfAbsent(extractor.label, extractor as Extractor<Message, Any>)
+                .computeIfAbsent(for_.label) { ConcurrentHashMap() }[key] = block as MessageReceiver<*>.() -> Unit
+        extractors.putIfAbsent(for_.label, for_ as Extractor<Message, Any>)
         if (timeout != NEVER) {
             scope.launch(Dispatchers.IO) {
                 delay(timeout)
                 val extractorMap = listeners[MType::class]
                 if (extractorMap != null) {
-                    val receiverMap = extractorMap[extractor.label]
+                    val receiverMap = extractorMap[for_.label]
                     if (receiverMap != null) {
                         receiverMap.remove(key)
                         if (receiverMap.isEmpty()) {
-                            extractorMap.remove(extractor.label)
+                            extractorMap.remove(for_.label)
                         }
                     }
                 }
@@ -54,7 +54,7 @@ class MessageRouter {
         for ((extractorLabel, keys) in classListeners.entries) {
             val extractor = extractors[extractorLabel]
             requireNotNull(extractor) { "No extractor found for label $extractorLabel" }
-            val receiver = keys[extractor.f.invoke(SenderMessage(sender, message))]
+            val receiver = keys[extractor.extractor.invoke(SenderMessage(sender, message))]
             receiver?.invoke(object : MessageReceiver<Message> {
                 override val sender = sender
                 override val message: Message = message

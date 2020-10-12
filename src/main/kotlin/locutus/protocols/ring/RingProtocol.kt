@@ -39,7 +39,7 @@ class RingProtocol(
 
         listenForAssimilateRequest()
 
-        cm.listen(Extractors.closeConnection, Unit, NEVER) {
+        cm.listen(closeConnection, Unit, NEVER) {
             TODO()
         }
 
@@ -85,7 +85,7 @@ class RingProtocol(
             cm.sendReceive(
                 to = gateway.peer,
                 message = JoinRequest(JoinRequest.Type.Initial(cm.myKey.public), maxHopsToLive),
-                extractor = Extractors.joinAccept,
+                extractor = joinAccept,
                 key = gateway.peer,
                 retries = 5,
                 retryDelay = Duration.ofSeconds(1)
@@ -126,7 +126,7 @@ class RingProtocol(
         cm.addConnection(newPeer.peerKey, false)
         val ocReceived = AtomicBoolean(false)
         val connectionEstablished = AtomicBoolean(false)
-        cm.listen(Extractors.openConnection, newPeer.peerKey.peer, Duration.ofSeconds(30)) {
+        cm.listen(openConnection, newPeer.peerKey.peer, Duration.ofSeconds(30)) {
             if (message.isInitiate) {
                 ocReceived.set(true)
                 connectionEstablished.set(true)
@@ -151,8 +151,7 @@ class RingProtocol(
 
 
 
-    object Extractors {
-
+    companion object {
         val joinAccept = Extractor<JoinResponse, Peer>("joinAccept") { sender }
 
         val openConnection = Extractor<Message.Ring.OpenConnection, Peer>("openConnection") { sender }
