@@ -4,6 +4,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants
+import locutus.Constants.MAX_UDP_PACKET_SIZE
 import locutus.net.messages.*
 import locutus.tools.crypto.*
 import locutus.tools.crypto.rsa.*
@@ -86,7 +87,7 @@ class ConnectionManager(
 
     private fun startListenThread() {
         channel.socket().bind(InetSocketAddress(port))
-        val buf = ByteBuffer.allocateDirect(Constants.MAX_UDP_PACKET_SIZE + 200)
+        val buf = ByteBuffer.allocateDirect(MAX_UDP_PACKET_SIZE + 200)
         thread {
             while (true) {
                 val sender = Peer(channel.receive(buf) as InetSocketAddress)
@@ -167,6 +168,7 @@ class ConnectionManager(
             }
 
             val outboundRaw = (keyPrepend + encryptedMessage).merge()
+            require(outboundRaw.size <= MAX_UDP_PACKET_SIZE) { "Message size ${outboundRaw.size} exceeds MAX_UDP_PACKET_SIZE ($MAX_UDP_PACKET_SIZE)" }
             logger.debug { "Sending ${outboundRaw.size}b message to $to" }
             channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
         }
@@ -308,7 +310,7 @@ class ConnectionManager(
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
             } else {
                 logger.debug { "Handling message: ${message::class.simpleName}" }
-                if (message !is Initiate || !message.isInitiate) {
+                if (message !is CanInitiate || !message.isInitiate) {
                     logger.debug { "Message is response, indicating outboundKey has been received" }
                     when (val type = connection.type) {
                         is Connection.Type.Symmetric -> type.outboundKeyReceived = true

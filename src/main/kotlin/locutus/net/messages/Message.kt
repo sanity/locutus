@@ -2,9 +2,7 @@
 package locutus.net.messages
 
 import kotlinx.serialization.*
-import kotlinx.serialization.modules.SerializersModule
 import kweb.util.random
-import locutus.tools.crypto.rsa.*
 import locutus.tools.math.Location
 import java.security.interfaces.RSAPublicKey
 
@@ -21,13 +19,13 @@ sealed class Message {
 
     object Ring {
         @Serializable
-        class JoinRequest(val type : Type, val hopsToLive : Int) : Message(), Initiate {
+        class JoinRequest(val type : Type, val hopsToLive : Int) : Message(), CanInitiate {
             override val isInitiate = false
 
             @Serializable
             sealed class Type {
                 @Serializable class Initial(val myPublicKey : RSAPublicKey) : Type()
-                @Serializable class Proxy(val toAssimilate : PeerKeyLocation) : Type()
+                @Serializable class Proxy(val joiner : PeerKeyLocation) : Type()
             }
         }
 
@@ -41,7 +39,7 @@ sealed class Message {
         }
 
         @Serializable
-        class OpenConnection(override val isInitiate: Boolean) : Message(), Initiate
+        class OpenConnection(override val isInitiate: Boolean) : Message(), CanInitiate
 
         @Serializable
         class CloseConnection(val reason : String) : Message()
@@ -49,7 +47,7 @@ sealed class Message {
 
     object Testing {
         @Serializable
-        data class FooMessage(val v : Int, override val isInitiate: Boolean) : Message(), Initiate
+        data class FooMessage(val v : Int, override val isInitiate: Boolean) : Message(), CanInitiate
 
         @Serializable
         data class BarMessage(val n : String) : Message()
@@ -57,12 +55,12 @@ sealed class Message {
 }
 
 /**
- * Marker interface on a message which indicates it is initiating a connection
- * and cannot be taken as indication that we have the sender's symkey.  If this
- * marker is not present, it's assumed that the mesage is a response and the
- * sender does have our key.
+ * Marker interface on a message which indicates it may initiate a connection,
+ * and therefore can't be assumed to confirm the sender has our outbound symkey.
+ *
+ * [isInitiate] must also return true for this to be the case.
  */
-interface Initiate {
+interface CanInitiate {
     val isInitiate : Boolean
 }
 
