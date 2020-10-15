@@ -99,7 +99,7 @@ class RingProtocol(
                 emptySet()
             }
 
-            val joinResponse = JoinResponse(replyType, acceptedBy)
+            val joinResponse = JoinResponse(replyType, initialSender, acceptedBy)
             cm.send(sender, joinResponse)
 
             if (message.hopsToLive > 0) {
@@ -141,8 +141,8 @@ class RingProtocol(
             cm.send(
                 to = gateway.peer,
                 message = JoinRequest(Initial(cm.myKey.public), maxHopsToLive),
-                extractor = Extractor<JoinResponse, JoinerProxy>("joinAccept") { JoinerProxy(joiner = message.joiner, proxy = sender) },
-                key = JoinerProxy(joiner = myPeerKeyLocation!!.peerKey.peer, proxy = gateway.peer),
+                extractor = Extractor<JoinResponse, JoinerProxy>("joinAccept") { JoinerProxy(message.joiner, sender) },
+                key = JoinerProxy(myPeerKeyLocation!!.peerKey.peer, gateway.peer),
                 retries = 5,
                 retryDelay = Duration.ofSeconds(1)
             ) {
