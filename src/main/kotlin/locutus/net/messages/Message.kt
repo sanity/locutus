@@ -30,7 +30,7 @@ sealed class Message {
         }
 
         @Serializable
-        class JoinResponse(val type : Type, val joiner : Peer, val acceptedBy : Set<PeerKeyLocation>) : Message() {
+        class JoinResponse(val type : Type, val joiner : Peer, val acceptedBy : Set<PeerKeyLocation>, override val replyTo: MessageId) : Message(), Reply {
             @Serializable
             sealed class Type {
                 @Serializable class Initial(val yourExternalAddress : Peer, val yourLocation : Location) : Type()
@@ -62,6 +62,10 @@ sealed class Message {
  */
 interface CanInitiate {
     val isInitiate : Boolean
+}
+
+interface Reply {
+    val replyTo : MessageId
 }
 
 @Serializable
