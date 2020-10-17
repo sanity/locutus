@@ -1,20 +1,30 @@
 package locutus.net
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.protobuf.ProtoBuf
-import locutus.Constants
 import locutus.Constants.MAX_UDP_PACKET_SIZE
 import locutus.net.messages.*
-import locutus.tools.crypto.*
-import locutus.tools.crypto.rsa.*
-import mu.*
+import locutus.tools.crypto.AESKey
+import locutus.tools.crypto.merge
+import locutus.tools.crypto.rsa.RSAEncrypted
+import locutus.tools.crypto.rsa.RSAKeyPair
+import locutus.tools.crypto.rsa.decrypt
+import locutus.tools.crypto.rsa.encrypt
+import locutus.tools.crypto.startsWith
+import mu.KotlinLogging
+import mu.withLoggingContext
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
-import java.time.*
-import java.util.concurrent.*
-import java.util.concurrent.atomic.*
+import java.time.Duration
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 
@@ -22,16 +32,16 @@ import kotlin.concurrent.thread
  * Responsible for securely transmitting [Message]s between [Peer]s.
  */
 class ConnectionManager(
-    val port: Int,
-    val myKey: RSAKeyPair,
-    private val open: Boolean
+        val port: Int,
+        val myKey: RSAKeyPair,
+        private val open: Boolean
 ) {
 
     companion object {
         val protoBuf = ProtoBuf { encodeDefaults = false }
         val pingEvery: Duration = Duration.ofSeconds(30)
         val dropConnectionAfter: Duration = pingEvery.multipliedBy(10)
-        val keepAliveExtractor = Extractor<Message.Keepalive, Unit>("keepAlive") {Unit}
+        val keepAliveExtractor = Extractor<Message.Keepalive, Unit>("keepAlive") { Unit }
     }
 
     private val logger = KotlinLogging.logger {}
@@ -72,9 +82,9 @@ class ConnectionManager(
                 for ((peer, connection) in connections) {
                     delay(pingEvery.dividedBy(connections.size.toLong()))
                     if (connection.lastKeepaliveReceived != null && Duration.between(
-                            connection.lastKeepaliveReceived,
-                            Instant.now()
-                        ) > dropConnectionAfter
+                                    connection.lastKeepaliveReceived,
+                                    Instant.now()
+                            ) > dropConnectionAfter
                     ) {
                         removeConnection(peer, "Time since last keepalive exceeded $dropConnectionAfter")
                     } else {
@@ -104,8 +114,8 @@ class ConnectionManager(
     }
 
     fun addConnection(
-        peerKey: PeerKey,
-        unsolicited: Boolean
+            peerKey: PeerKey,
+            unsolicited: Boolean
     ): Connection {
         val (peer, pubKey) = peerKey
         require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
@@ -177,38 +187,23 @@ class ConnectionManager(
     /**
      * Send a message and listen for a response, this ensures that the response listener
      * is registered before the message is sent to avoid possible race condition.
-     */
-    inline fun <reified MType : Message, KeyType : Any> sendReceive(
-            to: Peer,
-            message: Message,
-            extractor: Extractor<MType, KeyType>,
-            key: KeyType,
-            timeout: Duration?,
-            noinline block: (MessageReceiver<MType>).() -> Unit
-    ) {
-        router.listen(extractor, key, timeout, block)
-        send(to, message)
-    }
-
-    /**
-     * Send a message and listen for a response, this ensures that the response listener
-     * is registered before the message is sent to avoid possible race condition.
      *
      * Will resend the message every [retryDelay] up to [retries] times until a resposne is received.
      * This shouldn't be a problem as [ConnectionManager] will automatically disregard duplicate messages (determined
      * by their [MessageId].
      */
-    inline fun <reified MType : Message, KeyType : Any> sendReceive(
+    inline fun <reified MType : Message, KeyType : Any> send(
             to: Peer,
             message: Message,
             extractor: Extractor<MType, KeyType>,
             key: KeyType,
-            retries: Int,
-            retryDelay: Duration,
+            retries: Int = 5,
+            retryDelay: Duration = Duration.ofMillis(200),
+            listenFor: Duration = Duration.ofSeconds(60),
             noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
         val responseReceived = AtomicBoolean(false)
-        sendReceive(to, message, extractor, key, retryDelay.multipliedBy(retries.toLong() + 1)) {
+        router.listen(extractor, key, listenFor, {
             val xSender = sender
             val xMessage: MType = message as MType // Not sure why this cast is necessary
             responseReceived.set(true)
@@ -216,10 +211,15 @@ class ConnectionManager(
                 override val sender: Peer = xSender
                 override val message: MType = xMessage
             })
-        }
+        })
+        send(to, message)
         scope.launch(Dispatchers.IO) {
+            val startTime = Instant.now()
             for (retryNo in 1..retries) {
                 delay(retryDelay)
+                if (Duration.between(startTime, Instant.now()) > listenFor) {
+                    break
+                }
                 if (responseReceived.get()) break
                 send(to, message)
             }
@@ -273,7 +273,7 @@ class ConnectionManager(
                 knownSymKeyPrefix != null && rawPacket.startsWith(knownSymKeyPrefix) -> {
                     logger.debug { "Packet has prepended symkey, but we've already received it" }
                     connection.type.decryptKey?.decrypt(rawPacket.splitPacket().payload)
-                        ?: error("knownSymKeyPrefix != null but connection.type.decryptKey is null, this shouldn't happen")
+                            ?: error("knownSymKeyPrefix != null but connection.type.decryptKey is null, this shouldn't happen")
                 }
 
                 connection.type.decryptKey == null -> {
@@ -292,7 +292,7 @@ class ConnectionManager(
                 connection.type.decryptKey != null -> {
                     logger.debug { "Packet received, decrypt key is known and isn't prepended, assume entire packet is payload" }
                     connection.type.decryptKey?.decrypt(rawPacket)
-                        ?: error("connection.type.decryptKey shouldn't be null")
+                            ?: error("connection.type.decryptKey shouldn't be null")
                 }
 
                 else -> error("Unhandled condition while decrypting payload")
@@ -331,7 +331,7 @@ private class SplitPacket(val encryptedAESKey: ByteArray, val payload: ByteArray
 
 private fun ByteArray.splitPacket(): SplitPacket {
     return SplitPacket(
-        this.copyOf(AESKey.RSA_ENCRYPTED_SIZE),
-        this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size)
+            this.copyOf(AESKey.RSA_ENCRYPTED_SIZE),
+            this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size)
     )
 }

@@ -12,8 +12,10 @@ import locutus.net.messages.Message.Ring.JoinRequest.Type.Initial
 import locutus.net.messages.Message.Ring.OpenConnection
 import locutus.tools.math.Location
 import mu.KotlinLogging
+import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.time.*
 import java.util.concurrent.atomic.*
+import kotlin.math.min
 
 class RingProtocol(
         private val cm: ConnectionManager,
@@ -64,10 +66,11 @@ class RingProtocol(
 
     private fun listenForJoinRequest() {
         cm.listen(
-                for_ = Extractor<JoinRequest, Unit>(label = "JoinRequest") { Unit },
+                for_ = Extractor<JoinRequest, Unit>("joinRequest") { Unit },
                 key = Unit,
                 timeout = NEVER
         ) {
+            val initialSender = sender
             val ring = ring
             requireNotNull(ring)
             val myPeerKeyLocation = myPeerKeyLocation
@@ -87,9 +90,43 @@ class RingProtocol(
                 }
             }
 
-            val acceptedBy : Set<PeerKeyLocation>
-            if (ring.shouldAccept(peerKeyLocation.location)) {
-                acceptedBy = setOf(myPeerKeyLocation)
+            val acceptedBy : Set<PeerKeyLocation> = if (ring.shouldAccept(peerKeyLocation.location)) {
+                scope.launch {
+                    establishConnection(peerKeyLocation)
+                }
+                setOf(myPeerKeyLocation)
+            } else {
+                emptySet()
+            }
+
+            val joinResponse = JoinResponse(replyType, initialSender, acceptedBy)
+            cm.send(sender, joinResponse)
+
+            if (message.hopsToLive > 0) {
+                val forwardTo = if (message.hopsToLive >= randomRouteHTL) {
+                    ring.randomPeer()
+                } else {
+                    ring.connectionsByDistance(peerKeyLocation.location).firstEntry().value
+                }.peerKey.peer
+
+                val forwarded = JoinRequest(JoinRequest.Type.Proxy(peerKeyLocation), min(message.hopsToLive, maxHopsToLive) - 1)
+
+                val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
+                acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
+
+                cm.send(
+                        to = forwardTo,
+                        message = forwarded,
+                        extractor = Extractor<JoinResponse, Peer>("joinResponseProxy") { forwardTo },
+                        key = forwardTo,
+                        retries = 3,
+                        retryDelay = Duration.ofMillis(200)
+                ) {
+                    val newAcceptors = HashSet(message.acceptedBy.filter { it.peerKey !in forwardedAcceptors })
+                    if (newAcceptors.isNotEmpty()) {
+                        cm.send(initialSender, JoinResponse(JoinResponse.Type.Proxy, newAcceptors))
+                    }
+                }
             }
         }
     }
@@ -101,11 +138,11 @@ class RingProtocol(
     private fun joinRing() {
         for (gateway in gateways.toList().shuffled()) {
             cm.addConnection(gateway, true)
-            cm.sendReceive(
+            cm.send(
                 to = gateway.peer,
                 message = JoinRequest(Initial(cm.myKey.public), maxHopsToLive),
-                extractor = Extractor<JoinResponse, Peer>("joinAccept") { sender },
-                key = gateway.peer,
+                extractor = Extractor<JoinResponse, JoinerProxy>("joinAccept") { JoinerProxy(message.joiner, sender) },
+                key = JoinerProxy(myPeerKeyLocation!!.peerKey.peer, gateway.peer),
                 retries = 5,
                 retryDelay = Duration.ofSeconds(1)
             ) {
@@ -174,3 +211,5 @@ class RingProtocol(
 
 
 }
+
+data class JoinerProxy(val joiner : Peer, val proxy : Peer)
