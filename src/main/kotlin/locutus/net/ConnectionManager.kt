@@ -305,7 +305,7 @@ class ConnectionManager(
     }
 
     private fun handleMessage(connection: Connection, message: Message) {
-        withLoggingContext("sender" to connection.peer.toString(), "message" to message::class.toString()) {
+        withLoggingContext("sender" to connection.peer.toString(), "message" to message::class.simpleName.toString()) {
             if (message.id in receivedMessageIds) {
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
             } else {
