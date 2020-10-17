@@ -70,7 +70,7 @@ class RingProtocol(
                 key = Unit,
                 timeout = NEVER
         ) {
-            val initialSender = sender
+            val joiner = sender
             val ring = ring
             requireNotNull(ring)
             val myPeerKeyLocation = myPeerKeyLocation
@@ -82,7 +82,7 @@ class RingProtocol(
                 is Initial -> {
                     peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
                     replyType = JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
-                    cm.send(sender, JoinResponse(replyType, emptySet()))
+                    cm.send(sender, JoinResponse(replyType, joiner, emptySet()))
                 }
                 is JoinRequest.Type.Proxy -> {
                     peerKeyLocation = type.joiner
@@ -99,7 +99,7 @@ class RingProtocol(
                 emptySet()
             }
 
-            val joinResponse = JoinResponse(replyType, initialSender, acceptedBy)
+            val joinResponse = JoinResponse(replyType, joiner, acceptedBy)
             cm.send(sender, joinResponse)
 
             if (message.hopsToLive > 0) {
@@ -114,17 +114,15 @@ class RingProtocol(
                 val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
                 acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
 
-                cm.send(
+                cm.send<JoinResponse>(
                         to = forwardTo,
-                        message = forwarded,
-                        extractor = Extractor<JoinResponse, Peer>("joinResponseProxy") { forwardTo },
-                        key = forwardTo,
+                        message = JoinRequest(),
                         retries = 3,
                         retryDelay = Duration.ofMillis(200)
                 ) {
                     val newAcceptors = HashSet(message.acceptedBy.filter { it.peerKey !in forwardedAcceptors })
                     if (newAcceptors.isNotEmpty()) {
-                        cm.send(initialSender, JoinResponse(JoinResponse.Type.Proxy, newAcceptors))
+                        cm.send(joiner, JoinResponse(JoinResponse.Type.Proxy, newAcceptors))
                     }
                 }
             }

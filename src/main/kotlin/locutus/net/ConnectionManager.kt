@@ -26,6 +26,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
+import kotlin.reflect.KClass
+import kotlin.reflect.full.isSubclassOf
 
 
 /**
@@ -184,6 +186,9 @@ class ConnectionManager(
         }
     }
 
+    @PublishedApi
+    internal val replyExtractorMap = ConcurrentHashMap<KClass<*>, ReplyExtractor<*>>()
+
     /**
      * Send a message and listen for a response, this ensures that the response listener
      * is registered before the message is sent to avoid possible race condition.
@@ -192,24 +197,25 @@ class ConnectionManager(
      * This shouldn't be a problem as [ConnectionManager] will automatically disregard duplicate messages (determined
      * by their [MessageId].
      */
-    inline fun <reified MType : Message, KeyType : Any> send(
+    inline fun <reified ReplyType : Message> send(
             to: Peer,
             message: Message,
-            extractor: Extractor<MType, KeyType>,
-            key: KeyType,
             retries: Int = 5,
             retryDelay: Duration = Duration.ofMillis(200),
             listenFor: Duration = Duration.ofSeconds(60),
-            noinline block: (MessageReceiver<MType>).() -> Unit
+            noinline block: (MessageReceiver<ReplyType>).() -> Unit
     ) {
+        assert(Reply::class.java.isAssignableFrom(ReplyType::class.java)) {"ReplyType must implement Reply interface"}
+
         val responseReceived = AtomicBoolean(false)
-        router.listen(extractor, key, listenFor, {
+        val replyExtractor = replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
+        router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, {
             val xSender = sender
-            val xMessage: MType = message as MType // Not sure why this cast is necessary
+            val xMessage: ReplyType = message as ReplyType // Not sure why this cast is necessary
             responseReceived.set(true)
-            block(object : MessageReceiver<MType> {
+            block(object : MessageReceiver<ReplyType> {
                 override val sender: Peer = xSender
-                override val message: MType = xMessage
+                override val message: ReplyType = xMessage
             })
         })
         send(to, message)
