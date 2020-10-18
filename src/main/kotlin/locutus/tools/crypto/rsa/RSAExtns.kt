@@ -4,7 +4,10 @@ package locutus.tools.crypto.rsa
 
 import kotlinx.serialization.*
 import locutus.tools.crypto.AESKey
+import locutus.tools.crypto.ec.ECSignature
 import java.security.Signature
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import javax.crypto.Cipher
