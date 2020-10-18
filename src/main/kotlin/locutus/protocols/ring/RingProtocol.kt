@@ -82,7 +82,7 @@ class RingProtocol(
                 is Initial -> {
                     peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
                     replyType = JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
-                    cm.send(sender, JoinResponse(replyType, joiner, emptySet()))
+                    cm.send(sender, JoinResponse(replyType, joiner, emptySet(), message.id))
                 }
                 is JoinRequest.Type.Proxy -> {
                     peerKeyLocation = type.joiner
@@ -99,7 +99,12 @@ class RingProtocol(
                 emptySet()
             }
 
-            val joinResponse = JoinResponse(replyType, joiner, acceptedBy)
+            val joinResponse = JoinResponse(
+                    type = replyType,
+                    joiner = joiner,
+                    acceptedBy = acceptedBy,
+                    replyTo = message.id
+            )
             cm.send(sender, joinResponse)
 
             if (message.hopsToLive > 0) {
