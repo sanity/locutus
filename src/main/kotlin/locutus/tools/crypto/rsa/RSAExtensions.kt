@@ -5,6 +5,8 @@ package locutus.tools.crypto.rsa
 import kotlinx.serialization.*
 import locutus.tools.crypto.AESKey
 import java.security.Signature
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import javax.crypto.Cipher
@@ -21,6 +23,40 @@ fun RSAPublicKey.verify(signature : RSASignature, toVerify : ByteArray) : Boolea
     sig.initVerify(this)
     sig.update(toVerify)
     return sig.verify(signature.array)
+}
+
+
+fun ECPrivateKey.sign(toSign : ByteArray) : ECSignature {
+    val sig : Signature = Signature.getInstance("SHA256withECDSA", "BC")
+    sig.initSign(this)
+    sig.update(toSign)
+    return ECSignature(sig.sign())
+}
+
+fun ECPublicKey.verify(signature : ECSignature, toVerify : ByteArray) : Boolean {
+    val sig = Signature.getInstance("SHA256withECDSA", "BC")
+    sig.initVerify(this)
+    sig.update(toVerify)
+    return sig.verify(signature.array)
+}
+
+
+@Serializable
+data class ECSignature(val array : ByteArray) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as ECSignature
+
+        if (!array.contentEquals(other.array)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return array.contentHashCode()
+    }
 }
 
 @Serializable
