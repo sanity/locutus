@@ -23,7 +23,7 @@ class RingProtocol(
         private val maxHopsToLive : Int = 10,
         private val randomRouteHTL : Int = 3
 ) {
-
+/*
     private val scope = MainScope()
 
     private val logger = KotlinLogging.logger {}
@@ -206,8 +206,9 @@ class RingProtocol(
             }
         }
     }
-
+*/
 
 }
 
 data class JoinerProxy(val joiner : Peer, val proxy : Peer)
+

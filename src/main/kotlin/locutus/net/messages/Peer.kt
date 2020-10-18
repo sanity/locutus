@@ -3,6 +3,7 @@ package locutus.net.messages
 import kotlinx.serialization.Serializable
 import locutus.tools.math.Location
 import java.net.*
+import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 
 @Serializable
@@ -36,10 +37,10 @@ data class Peer(val addr: ByteArray, val port: Int) {
 }
 
 @Serializable
-data class PeerKey(val peer: Peer, val key : RSAPublicKey)
+data class PeerKey(val peer: Peer, val key : ECPublicKey)
 
 @Serializable
 data class PeerKeyLocation(val peerKey: PeerKey, val location : Location) {
-    constructor(peer : Peer, key : RSAPublicKey, location : Location) :
+    constructor(peer : Peer, key : ECPublicKey, location : Location) :
             this(PeerKey(peer, key), location)
 }

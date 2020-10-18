@@ -9,8 +9,8 @@ import locutus.Constants.MAX_UDP_PACKET_SIZE
 import locutus.net.messages.*
 import locutus.tools.crypto.AESKey
 import locutus.tools.crypto.merge
-import locutus.tools.crypto.rsa.RSAEncrypted
-import locutus.tools.crypto.rsa.RSAKeyPair
+import locutus.tools.crypto.rsa.ECEncrypted
+import locutus.tools.crypto.rsa.ECKeyPair
 import locutus.tools.crypto.rsa.decrypt
 import locutus.tools.crypto.rsa.encrypt
 import locutus.tools.crypto.startsWith
@@ -27,16 +27,15 @@ import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.reflect.KClass
-import kotlin.reflect.full.isSubclassOf
 
 
 /**
  * Responsible for securely transmitting [Message]s between [Peer]s.
  */
 class ConnectionManager(
-        val port: Int,
-        val myKey: RSAKeyPair,
-        private val open: Boolean
+    val port: Int,
+    val myKey: ECKeyPair,
+    private val open: Boolean
 ) {
 
     companion object {
@@ -269,7 +268,7 @@ class ConnectionManager(
                     }
                     logger.debug { "Packet received from unknown sender, assume its prepended, extract and use" }
                     val splitPacket = rawPacket.splitPacket()
-                    val symKey = AESKey(myKey.private.decrypt(RSAEncrypted(splitPacket.encryptedAESKey)))
+                    val symKey = AESKey(myKey.private.decrypt(ECEncrypted(splitPacket.encryptedAESKey)))
                     val inboundType = Connection.Type.Inbound(InboundKey(symKey, splitPacket.encryptedAESKey))
                     connection = Connection(sender, inboundType, null)
                     connections[sender] = connection
@@ -285,7 +284,7 @@ class ConnectionManager(
                 connection.type.decryptKey == null -> {
                     logger.debug { "Packet received, decrypt key unknown, assume its prepended and parse it" }
                     val splitPacket = rawPacket.splitPacket()
-                    val symKey = AESKey(myKey.private.decrypt(RSAEncrypted(splitPacket.encryptedAESKey)))
+                    val symKey = AESKey(myKey.private.decrypt(ECEncrypted(splitPacket.encryptedAESKey)))
                     when (val type = connection.type) {
                         is Connection.Type.Symmetric -> {
                             type.inboundKey = InboundKey(symKey, splitPacket.encryptedAESKey)

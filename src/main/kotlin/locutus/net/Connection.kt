@@ -3,6 +3,7 @@ package locutus.net
 import locutus.net.messages.*
 import locutus.tools.crypto.AESKey
 import org.bouncycastle.jcajce.provider.symmetric.AES
+import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.time.Instant
 
@@ -15,7 +16,7 @@ class Connection(
         abstract val decryptKey : AESKey?
 
         class Symmetric(
-            val pubKey: RSAPublicKey,
+            val pubKey: ECPublicKey,
             @Volatile var outboundKeyReceived: Boolean,
             val outboundKey : AESKey,
             val encryptedOutboundKeyPrefix : ByteArray,
@@ -26,7 +27,7 @@ class Connection(
         }
 
         class Outbound(
-            val pubKey: RSAPublicKey,
+            val pubKey: ECPublicKey,
             @Volatile var outboundKeyReceived: Boolean,
             val outboundKey : AESKey,
             val encryptedOutboundKeyPrefix : ByteArray,

@@ -19,7 +19,7 @@ class AESKeySpec : FunSpec({
         val key = AESKey.generate()
         key.bytes.size shouldBe AESKey.KEY_SIZE_BYTES
 
-        val rsa = RSAKeyPair.create()
+        val rsa = ECKeyPair.create()
         val pub = rsa.public.encrypt(key.bytes)
         pub.ciphertext.size shouldBe AESKey.RSA_ENCRYPTED_SIZE
     }

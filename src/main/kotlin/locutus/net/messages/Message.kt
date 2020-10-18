@@ -4,6 +4,8 @@ package locutus.net.messages
 import kotlinx.serialization.*
 import kweb.util.random
 import locutus.tools.math.Location
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 
 @Serializable
@@ -24,7 +26,7 @@ sealed class Message {
 
             @Serializable
             sealed class Type {
-                @Serializable class Initial(val myPublicKey : RSAPublicKey) : Type()
+                @Serializable class Initial(val myPublicKey : ECPublicKey) : Type()
                 @Serializable class Proxy(val joiner : PeerKeyLocation) : Type()
             }
         }

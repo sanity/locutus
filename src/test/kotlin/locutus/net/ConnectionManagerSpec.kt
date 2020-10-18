@@ -8,7 +8,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import locutus.net.messages.*
 import locutus.net.messages.Message.Testing.BarMessage
 import locutus.net.messages.Message.Testing.FooMessage
-import locutus.tools.crypto.rsa.RSAKeyPair
+import locutus.tools.crypto.rsa.ECKeyPair
 import java.net.InetSocketAddress
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
@@ -20,8 +20,8 @@ import kotlin.time.seconds
 @Order(0)
 class ConnectionManagerSpec : FunSpec({
     context("two non-open managers") {
-        val cm1 = ConnectionManager(port = 13255, myKey = RSAKeyPair.create(), open = false)
-        val cm2 = ConnectionManager(port = 13256, myKey = RSAKeyPair.create(), open = false)
+        val cm1 = ConnectionManager(port = 13255, myKey = ECKeyPair.create(), open = false)
+        val cm2 = ConnectionManager(port = 13256, myKey = ECKeyPair.create(), open = false)
         val peer2 = Peer(InetSocketAddress("localhost", cm2.port))
         cm1.addConnection(PeerKey(peer2, cm2.myKey.public), false)
         val peer1 = Peer(InetSocketAddress("localhost", cm1.port))
@@ -74,8 +74,8 @@ class ConnectionManagerSpec : FunSpec({
     }
 
     context("Non-open to open") {
-        val cm1 = ConnectionManager(port = 13257, myKey = RSAKeyPair.create(), open = false)
-        val cm2 = ConnectionManager(port = 13258, myKey = RSAKeyPair.create(), open = true)
+        val cm1 = ConnectionManager(port = 13257, myKey = ECKeyPair.create(), open = false)
+        val cm2 = ConnectionManager(port = 13258, myKey = ECKeyPair.create(), open = true)
         val peer2 = Peer(InetSocketAddress("localhost", cm2.port))
         cm1.addConnection(PeerKey(peer2, cm2.myKey.public), unsolicited = true)
         val peer1 = Peer(InetSocketAddress("localhost", cm1.port))

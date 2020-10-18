@@ -16,7 +16,7 @@ import java.nio.charset.Charset
 @Order(0)
 class RSASpec : FunSpec({
     test("simple encrypt decrypt") {
-        val keyPair = RSAKeyPair.create()
+        val keyPair = ECKeyPair.create()
         val plainText = "the rain in spain falls mainly on the plain".encodeToByteArray()
         val encoded = keyPair.public.encrypt(plainText)
         val decoded = keyPair.private.decrypt(encoded)
