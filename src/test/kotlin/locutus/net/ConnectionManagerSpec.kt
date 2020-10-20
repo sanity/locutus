@@ -33,7 +33,7 @@ class ConnectionManagerSpec : FunSpec({
                     peer1,
                     Duration.ofMillis(500)
             ) {
-                message.v shouldBe 12
+                received.v shouldBe 12
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(12, true))
@@ -48,7 +48,7 @@ class ConnectionManagerSpec : FunSpec({
                     key = peer2,
                     timeout = Duration.ofMillis(500)
             ) {
-                message.n shouldBe "hello"
+                received.n shouldBe "hello"
                 barReceived.set(true)
             }
             cm2.send(peer1, BarMessage("hello"))
@@ -63,7 +63,7 @@ class ConnectionManagerSpec : FunSpec({
                     peer1,
                     Duration.ofMillis(500)
             ) {
-                message.v shouldBe 56
+                received.v shouldBe 56
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(56, true))
@@ -83,7 +83,7 @@ class ConnectionManagerSpec : FunSpec({
         test("Send a FooMesage from peer1 to peer2 which is an initiate message") {
             val fooReceived = AtomicBoolean(false)
             cm2.listen(Extractor<FooMessage, Peer>("fooExtractor") { sender }, peer1, Duration.ofMillis(500)) {
-                message.v shouldBe 12
+                received.v shouldBe 12
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(12, true))
@@ -94,7 +94,7 @@ class ConnectionManagerSpec : FunSpec({
         test("Peer2 responds with a BarMessage which is not an initiate message") {
             val barReceived = AtomicBoolean(false)
             cm1.listen(Extractor<BarMessage, Peer>("barExtractor") { sender  }, key = peer2, timeout = Duration.ofMillis(500)) {
-                message.n shouldBe "hello"
+                received.n shouldBe "hello"
                 barReceived.set(true)
             }
             cm2.send(peer1, BarMessage("hello"))
@@ -109,7 +109,7 @@ class ConnectionManagerSpec : FunSpec({
                     peer1,
                     Duration.ofMillis(500)
             ) {
-                message.v shouldBe 56
+                received.v shouldBe 56
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(56, true))

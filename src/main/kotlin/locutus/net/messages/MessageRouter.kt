@@ -57,7 +57,7 @@ class MessageRouter {
             val receiver = keys[extractor.extractor.invoke(SenderMessage(sender, message))]
             receiver?.invoke(object : MessageReceiver<Message> {
                 override val sender = sender
-                override val message: Message = message
+                override val received: Message = message
             })
         }
     }
@@ -71,10 +71,10 @@ class MessageRouter {
     internal val extractors = ConcurrentHashMap<String, Extractor<Message, Any>>()
 }
 
-interface MessageReceiver<MType : Message> {
+interface MessageReceiver<ReceivedMessageType : Message> {
     val sender: Peer
 
-    val message: MType
+    val received: ReceivedMessageType
 }
 
 typealias ExtractorLabel = String

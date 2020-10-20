@@ -215,7 +215,7 @@ class ConnectionManager(
             responseReceived.set(true)
             block(object : MessageReceiver<ReplyType> {
                 override val sender: Peer = xSender
-                override val message: ReplyType = xMessage
+                override val received: ReplyType = xMessage
             })
         })
         send(to, message)
