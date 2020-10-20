@@ -12,4 +12,5 @@ class SimulatedNetwork {
     fun createTransport(isOpen : Boolean): SimulatedTransport {
         return SimulatedTransport(Peer(InetSocketAddress("localhost", port.getAndIncrement())), this, isOpen)
     }
+
 }
