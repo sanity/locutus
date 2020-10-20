@@ -16,28 +16,25 @@ import locutus.tools.crypto.rsa.encrypt
 import locutus.tools.crypto.startsWith
 import mu.KotlinLogging
 import mu.withLoggingContext
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-import java.nio.channels.DatagramChannel
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.concurrent.thread
 import kotlin.reflect.KClass
-import kotlin.reflect.full.isSubclassOf
 
 
 /**
  * Responsible for securely transmitting [Message]s between [Peer]s.
  */
 class ConnectionManager(
-        val port: Int,
         val myKey: RSAKeyPair,
-        private val open: Boolean
+        val transport: Transport,
 ) {
+
+    constructor(port: Int, isOpen: Boolean, myKey: RSAKeyPair) :
+            this(myKey, UDPTransport(port, isOpen))
 
     companion object {
         val protoBuf = ProtoBuf { encodeDefaults = false }
@@ -58,15 +55,15 @@ class ConnectionManager(
     @PublishedApi
     internal val router = MessageRouter()
 
-    private val channel: DatagramChannel = DatagramChannel.open()
 
     init {
-        withLoggingContext("port" to port.toString()) {
-            logger.info { "Listening on UDP port $port" }
-            startListenThread()
-            launchKeepaliveCoroutine()
-            listenForKeepalives()
+        scope.launch(Dispatchers.IO) {
+            for ((sender, packet) in transport.recepient) {
+                handleReceivedPacket(sender, packet)
+            }
         }
+        launchKeepaliveCoroutine()
+        listenForKeepalives()
     }
 
     private fun listenForKeepalives() {
@@ -92,24 +89,6 @@ class ConnectionManager(
                     } else {
                         send(peer, Message.Keepalive())
                     }
-                }
-            }
-        }
-    }
-
-    private fun startListenThread() {
-        channel.socket().bind(InetSocketAddress(port))
-        val buf = ByteBuffer.allocateDirect(MAX_UDP_PACKET_SIZE + 200)
-        thread {
-            while (true) {
-                val sender = Peer(channel.receive(buf) as InetSocketAddress)
-                logger.debug { "Packet received from $sender of length ${buf.remaining()}" }
-                buf.flip()
-                val byteArray = ByteArray(buf.remaining())
-                buf.get(byteArray)
-                buf.clear()
-                scope.launch(Dispatchers.IO) {
-                    handleReceivedPacket(sender, byteArray)
                 }
             }
         }
@@ -182,7 +161,7 @@ class ConnectionManager(
             val outboundRaw = (keyPrepend + encryptedMessage).merge()
             require(outboundRaw.size <= MAX_UDP_PACKET_SIZE) { "Message size ${outboundRaw.size} exceeds MAX_UDP_PACKET_SIZE ($MAX_UDP_PACKET_SIZE)" }
             logger.debug { "Sending ${outboundRaw.size}b message to $to" }
-            channel.send(ByteBuffer.wrap(outboundRaw), to.asSocketAddress)
+            transport.send(to, outboundRaw)
         }
     }
 
@@ -205,7 +184,7 @@ class ConnectionManager(
             listenFor: Duration = Duration.ofSeconds(60),
             noinline block: (MessageReceiver<ReplyType>).() -> Unit
     ) {
-        assert(Reply::class.java.isAssignableFrom(ReplyType::class.java)) {"ReplyType must implement Reply interface"}
+        assert(Reply::class.java.isAssignableFrom(ReplyType::class.java)) { "ReplyType must implement Reply interface" }
 
         val responseReceived = AtomicBoolean(false)
         val replyExtractor = replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
@@ -263,7 +242,7 @@ class ConnectionManager(
 
                 connection == null -> {
                     logger.debug { "Packet received from unknown sender" }
-                    if (!open) {
+                    if (!transport.isOpen) {
                         logger.warn("Disregarding packet from unknown sender because I'm not open")
                         return
                     }
