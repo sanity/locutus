@@ -74,6 +74,7 @@ class RingProtocol(
                 timeout = NEVER
         ) {
             val joiner = sender
+            logger.debug { "JoinRequest received from $joiner" }
             val ring = ring
             requireNotNull(ring)
             val myPeerKeyLocation = myPeerKeyLocation
@@ -81,6 +82,7 @@ class RingProtocol(
 
             val peerKeyLocation: PeerKeyLocation
             val replyType: JoinResponse.Type
+            logger.debug { "JoinRequest type is ${received.type}" }
             when (val type = received.type) {
                 is Initial -> {
                     peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
@@ -184,6 +186,7 @@ class RingProtocol(
      * sending.
      */
     private suspend fun establishConnection(newPeer: PeerKeyLocation) {
+        logger.debug { "Establishing connection with $newPeer" }
         cm.addConnection(newPeer.peerKey, false)
         val ocReceived = AtomicBoolean(false)
         val connectionEstablished = AtomicBoolean(false)

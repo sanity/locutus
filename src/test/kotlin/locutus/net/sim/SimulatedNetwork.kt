@@ -5,12 +5,14 @@ import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.net.InetSocketAddress
 
 class SimulatedNetwork {
-    private val port = java.util.concurrent.atomic.AtomicInteger(1024)
+    private val portGenerator = java.util.concurrent.atomic.AtomicInteger(1024)
 
-    internal val transports = ConcurrentHashMap<Int, SimulatedTransport>()
+    val transports = ConcurrentHashMap<Int, SimulatedTransport>()
 
     fun createTransport(isOpen : Boolean): SimulatedTransport {
-        return SimulatedTransport(Peer(InetSocketAddress("localhost", port.getAndIncrement())), this, isOpen)
+        val transport = SimulatedTransport(Peer(InetSocketAddress("localhost", portGenerator.getAndIncrement())), this, isOpen)
+        transports[transport.peer.port] = transport
+        return transport
     }
 
 }

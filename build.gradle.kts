@@ -37,7 +37,7 @@ dependencies {
 
     implementation("ch.qos.logback:logback-classic:1.3.0-alpha5")
 
-    implementation("org.koin:koin-android:3.0.0-alpha-4")
+    implementation("org.koin:koin-core:2.1.6")
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
