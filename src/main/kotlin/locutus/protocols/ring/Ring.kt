@@ -43,7 +43,7 @@ class Ring(val myLocation: Location) {
         }
     }
 
-    fun randomPeer() = connectionsByLocation.values.random()
+    fun randomPeer() = connectionsByLocation.values.randomOrNull()
 
     private val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
 

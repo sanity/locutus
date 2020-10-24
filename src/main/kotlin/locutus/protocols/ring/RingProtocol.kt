@@ -84,7 +84,7 @@ class RingProtocol(
 
             val peerKeyLocation: PeerKeyLocation
             val replyType: JoinResponse.Type
-            logger.debug { "JoinRequest type is ${received.type}" }
+            logger.debug { "JoinRequest type is ${received.type::class.simpleName}" }
             when (val type = received.type) {
                 is Initial -> {
                     peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
@@ -118,25 +118,33 @@ class RingProtocol(
                     ring.randomPeer()
                 } else {
                     ring.connectionsByDistance(peerKeyLocation.location).firstEntry().value
-                }.peerKey.peer
+                }?.peerKey?.peer
 
-                val forwarded =
-                    JoinRequest(type = Proxy(peerKeyLocation), hopsToLive = min(received.hopsToLive, maxHopsToLive) - 1)
+                if (forwardTo != null) {
+                    val forwarded =
+                        JoinRequest(
+                            type = Proxy(peerKeyLocation),
+                            hopsToLive = min(received.hopsToLive, maxHopsToLive) - 1
+                        )
 
-                val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
-                acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
+                    val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
+                    acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
 
-                cm.send<JoinResponse>(
-                    to = forwardTo,
-                    message = forwarded,
-                    retries = 3,
-                    retryDelay = Duration.ofMillis(200)
-                ) {
-                    val newAcceptor =
-                        if (received.acceptedBy != null && received.acceptedBy !in forwardedAcceptors) received.acceptedBy else null
-                    if (newAcceptor != null) {
-                        cm.send(joiner, JoinResponse(JoinResponse.Type.Proxy, acceptedBy = newAcceptor, received.id))
+                    cm.send<JoinResponse>(
+                        to = forwardTo,
+                        message = forwarded,
+                        retries = 3,
+                        retryDelay = Duration.ofMillis(200)
+                    ) {
+                        for (newAcceptor in received.acceptedBy.filter { it !in forwardedAcceptors }) {
+                            cm.send(
+                                joiner,
+                                JoinResponse(JoinResponse.Type.Proxy, acceptedBy = setOf(newAcceptor), received.id)
+                            )
+                        }
                     }
+                } else {
+                    logger.warn { "Unable to forward message because Ring is empty" }
                 }
             }
         }

@@ -2,7 +2,8 @@
 
 package locutus.net.messages
 
-import kotlinx.serialization.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kweb.util.random
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
@@ -21,13 +22,15 @@ sealed class Message {
 
     object Ring {
         @Serializable
-        class JoinRequest(val type : Type, val hopsToLive : Int) : Message(), CanInitiate {
+        data class JoinRequest(val type: Type, val hopsToLive: Int) : Message(), CanInitiate {
             override val isInitiate = false
 
             @Serializable
             sealed class Type {
-                @Serializable class Initial(val myPublicKey : RSAPublicKey) : Type()
-                @Serializable class Proxy(val joiner : PeerKeyLocation) : Type()
+                @Serializable
+                data class Initial(val myPublicKey: RSAPublicKey) : Type()
+                @Serializable
+                data class Proxy(val joiner: PeerKeyLocation) : Type()
             }
         }
 
@@ -41,24 +44,26 @@ sealed class Message {
         ) : Message(), Reply {
             @Serializable
             sealed class Type {
-                @Serializable class Initial(val yourExternalAddress : Peer, val yourLocation : Location) : Type()
-                @Serializable object Proxy : Type()
+                @Serializable
+                data class Initial(val yourExternalAddress: Peer, val yourLocation: Location) : Type()
+                @Serializable
+                object Proxy : Type()
             }
         }
 
         @Serializable
-        class OpenConnection(override val isInitiate: Boolean) : Message(), CanInitiate
+        data class OpenConnection(override val isInitiate: Boolean) : Message(), CanInitiate
 
         @Serializable
-        class CloseConnection(val reason : String) : Message()
+        data class CloseConnection(val reason: String) : Message()
     }
 
     object Testing {
         @Serializable
-        data class FooMessage(val v : Int, override val isInitiate: Boolean) : Message(), CanInitiate
+        data class FooMessage(val v: Int, override val isInitiate: Boolean) : Message(), CanInitiate
 
         @Serializable
-        data class BarMessage(val n : String) : Message()
+        data class BarMessage(val n: String) : Message()
     }
 }
 
@@ -69,12 +74,12 @@ sealed class Message {
  * [isInitiate] must also return true for this to be the case.
  */
 interface CanInitiate {
-    val isInitiate : Boolean
+    val isInitiate: Boolean
 }
 
 interface Reply {
-    val replyTo : MessageId
+    val replyTo: MessageId
 }
 
 @Serializable
-data class MessageId(val long : Long = random.nextLong())
+data class MessageId(val long: Long = random.nextLong())
