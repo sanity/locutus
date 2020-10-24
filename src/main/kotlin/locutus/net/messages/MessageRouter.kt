@@ -9,7 +9,7 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 
-private val logger = KotlinLogging.logger {}
+@PublishedApi internal val logger = KotlinLogging.logger {}
 
 class MessageRouter {
 
@@ -24,6 +24,7 @@ class MessageRouter {
             timeout: Duration?,
             noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
+        logger.info("Add listener for ${MType::class}")
         listeners
                 .computeIfAbsent(MType::class) { ConcurrentHashMap() }
                 .computeIfAbsent(for_.label) { ConcurrentHashMap() }[key] = block as MessageReceiver<*>.() -> Unit

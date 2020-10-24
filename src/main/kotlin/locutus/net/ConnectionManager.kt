@@ -29,8 +29,8 @@ import kotlin.reflect.KClass
  * Responsible for securely transmitting [Message]s between [Peer]s.
  */
 class ConnectionManager(
-        val myKey: RSAKeyPair,
-        val transport: Transport,
+    val myKey: RSAKeyPair,
+    val transport: Transport,
 ) {
 
     constructor(port: Int, isOpen: Boolean, myKey: RSAKeyPair) :
@@ -81,9 +81,9 @@ class ConnectionManager(
                 for ((peer, connection) in connections) {
                     delay(pingEvery.dividedBy(connections.size.toLong()))
                     if (connection.lastKeepaliveReceived != null && Duration.between(
-                                    connection.lastKeepaliveReceived,
-                                    Instant.now()
-                            ) > dropConnectionAfter
+                            connection.lastKeepaliveReceived,
+                            Instant.now()
+                        ) > dropConnectionAfter
                     ) {
                         removeConnection(peer, "Time since last keepalive exceeded $dropConnectionAfter")
                     } else {
@@ -95,27 +95,30 @@ class ConnectionManager(
     }
 
     fun addConnection(
-            peerKey: PeerKey,
-            unsolicited: Boolean
+        peerKey: PeerKey,
+        unsolicited: Boolean
     ): Connection {
         val (peer, pubKey) = peerKey
-        require(!connections.containsKey(peer)) { "Connection to $peer already exists" }
-
         withLoggingContext("peer" to peer.toString()) {
-            logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
-            val outboundKey = AESKey.generate()
-            val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
-            val type = when (unsolicited) {
-                true -> {
-                    Connection.Type.Outbound(pubKey, false, outboundKey, encryptedOutboundKey)
+            if (connections.containsKey(peer)) {
+                logger.warn { "Connection to $peer already exists, won't add again" }
+                return connections.getValue(peer)
+            } else {
+                logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
+                val outboundKey = AESKey.generate()
+                val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
+                val type = when (unsolicited) {
+                    true -> {
+                        Connection.Type.Outbound(pubKey, false, outboundKey, encryptedOutboundKey)
+                    }
+                    false -> {
+                        Connection.Type.Symmetric(pubKey, false, outboundKey, encryptedOutboundKey, null)
+                    }
                 }
-                false -> {
-                    Connection.Type.Symmetric(pubKey, false, outboundKey, encryptedOutboundKey, null)
-                }
+                val connection = Connection(peer, type, null)
+                connections[peer] = connection
+                return connection
             }
-            val connection = Connection(peer, type, null)
-            connections[peer] = connection
-            return connection
         }
     }
 
@@ -177,17 +180,18 @@ class ConnectionManager(
      * by their [MessageId].
      */
     inline fun <reified ReplyType : Message> send(
-            to: Peer,
-            message: Message,
-            retries: Int = 5,
-            retryDelay: Duration = Duration.ofMillis(200),
-            listenFor: Duration = Duration.ofSeconds(60),
-            noinline block: (MessageReceiver<ReplyType>).() -> Unit
+        to: Peer,
+        message: Message,
+        retries: Int = 5,
+        retryDelay: Duration = Duration.ofMillis(200),
+        listenFor: Duration = Duration.ofSeconds(60),
+        noinline block: (MessageReceiver<ReplyType>).() -> Unit
     ) {
         assert(Reply::class.java.isAssignableFrom(ReplyType::class.java)) { "ReplyType must implement Reply interface" }
 
         val responseReceived = AtomicBoolean(false)
-        val replyExtractor = replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
+        val replyExtractor =
+            replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
         router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, {
             val xSender = sender
             val xMessage: ReplyType = message as ReplyType // Not sure why this cast is necessary
@@ -215,10 +219,10 @@ class ConnectionManager(
      * Listen for incoming messages, see [MessageRouter.listen]
      */
     inline fun <reified MType : Message, KeyType : Any> listen(
-            for_: Extractor<MType, KeyType>,
-            key: KeyType,
-            timeout: Duration?,
-            noinline block: (MessageReceiver<MType>).() -> Unit
+        for_: Extractor<MType, KeyType>,
+        key: KeyType,
+        timeout: Duration?,
+        noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
         router.listen(for_, key, timeout, block)
     }
@@ -258,7 +262,7 @@ class ConnectionManager(
                 knownSymKeyPrefix != null && rawPacket.startsWith(knownSymKeyPrefix) -> {
                     logger.debug { "Packet has prepended symkey, but we've already received it" }
                     connection.type.decryptKey?.decrypt(rawPacket.splitPacket().payload)
-                            ?: error("knownSymKeyPrefix != null but connection.type.decryptKey is null, this shouldn't happen")
+                        ?: error("knownSymKeyPrefix != null but connection.type.decryptKey is null, this shouldn't happen")
                 }
 
                 connection.type.decryptKey == null -> {
@@ -277,7 +281,7 @@ class ConnectionManager(
                 connection.type.decryptKey != null -> {
                     logger.debug { "Packet received, decrypt key is known and isn't prepended, assume entire packet is payload" }
                     connection.type.decryptKey?.decrypt(rawPacket)
-                            ?: error("connection.type.decryptKey shouldn't be null")
+                        ?: error("connection.type.decryptKey shouldn't be null")
                 }
 
                 else -> error("Unhandled condition while decrypting payload")
@@ -316,7 +320,7 @@ private class SplitPacket(val encryptedAESKey: ByteArray, val payload: ByteArray
 
 private fun ByteArray.splitPacket(): SplitPacket {
     return SplitPacket(
-            this.copyOf(AESKey.RSA_ENCRYPTED_SIZE),
-            this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size)
+        this.copyOf(AESKey.RSA_ENCRYPTED_SIZE),
+        this.copyOfRange(AESKey.RSA_ENCRYPTED_SIZE, this.size)
     )
 }

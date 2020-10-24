@@ -1,6 +1,10 @@
+@file:UseSerializers(RSAPublicKeySerializer::class)
+
 package locutus.net.messages
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
 import java.net.*
 import java.security.interfaces.RSAPublicKey

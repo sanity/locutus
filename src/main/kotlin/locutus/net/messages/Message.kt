@@ -32,7 +32,13 @@ sealed class Message {
         }
 
         @Serializable
-        class JoinResponse(val type : Type, val acceptedBy : PeerKeyLocation?, override val replyTo: MessageId) : Message(), Reply {
+        data class JoinResponse(
+            val type: Type,
+            // Note: ProtoBuf requires emptySet() default value, without it we get a runtime MissingFieldException at
+            // deserialization, see: https://github.com/Kotlin/kotlinx.serialization/issues/806
+            val acceptedBy: Set<PeerKeyLocation> = emptySet(),
+            override val replyTo: MessageId
+        ) : Message(), Reply {
             @Serializable
             sealed class Type {
                 @Serializable class Initial(val yourExternalAddress : Peer, val yourLocation : Location) : Type()

@@ -1,5 +1,6 @@
 package locutus.protocols.ring
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
@@ -21,10 +22,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
 
 class RingProtocol(
-        private val cm: ConnectionManager,
-        private val gateways: Set<PeerKey>,
-        private val maxHopsToLive: Int = 10,
-        private val randomRouteHTL: Int = 3
+    private val cm: ConnectionManager,
+    private val gateways: Set<PeerKey>,
+    private val maxHopsToLive: Int = 10,
+    private val randomRouteHTL: Int = 3,
+    @Volatile
+    private var myPeerKeyLocation: PeerKeyLocation? = null
 ) {
 
     private val scope = MainScope()
@@ -32,10 +35,9 @@ class RingProtocol(
     private val logger = KotlinLogging.logger {}
 
     @Volatile
-    private var ring: Ring? = null
-
-    @Volatile
-    private var myPeerKeyLocation: PeerKeyLocation? = null
+    private var ring: Ring? = myPeerKeyLocation.let { pcl ->
+        if (pcl == null) null else Ring(pcl.location)
+    }
 
     init {
         handleConnectionManagerRemoveConnection()
@@ -56,9 +58,9 @@ class RingProtocol(
 
     private fun listenForCloseConnection() {
         cm.listen(
-                for_ = Extractor<CloseConnection, Unit>("closeConnection") { Unit },
-                key = Unit,
-                timeout = NEVER
+            for_ = Extractor<CloseConnection, Unit>("closeConnection") { Unit },
+            key = Unit,
+            timeout = NEVER
         ) {
             ring.let { ring ->
                 requireNotNull(ring)
@@ -69,9 +71,9 @@ class RingProtocol(
 
     private fun listenForJoinRequest() {
         cm.listen(
-                for_ = Extractor<JoinRequest, Unit>("joinRequest") { Unit },
-                key = Unit,
-                timeout = NEVER
+            for_ = Extractor<JoinRequest, Unit>("joinRequest") { Unit },
+            key = Unit,
+            timeout = NEVER
         ) {
             val joiner = sender
             logger.debug { "JoinRequest received from $joiner" }
@@ -87,7 +89,7 @@ class RingProtocol(
                 is Initial -> {
                     peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
                     replyType = JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
-                    cm.send(sender, JoinResponse(type = replyType, acceptedBy = null, replyTo = received.id))
+                    cm.send(sender, JoinResponse(type = replyType, replyTo = received.id))
                 }
                 is Proxy -> {
                     peerKeyLocation = type.joiner
@@ -95,19 +97,19 @@ class RingProtocol(
                 }
             }
 
-            val acceptedBy: PeerKeyLocation? = if (ring.shouldAccept(peerKeyLocation.location)) {
-                scope.launch {
+            val acceptedBy: Set<PeerKeyLocation> = if (ring.shouldAccept(peerKeyLocation.location)) {
+                scope.launch(Dispatchers.IO) {
                     establishConnection(peerKeyLocation)
                 }
-                myPeerKeyLocation
+                setOf(myPeerKeyLocation)
             } else {
-                null
+                emptySet()
             }
 
             val joinResponse = JoinResponse(
-                    type = replyType,
-                    acceptedBy = acceptedBy,
-                    replyTo = received.id
+                type = replyType,
+                acceptedBy = acceptedBy,
+                replyTo = received.id
             )
             cm.send(sender, joinResponse)
 
@@ -118,18 +120,20 @@ class RingProtocol(
                     ring.connectionsByDistance(peerKeyLocation.location).firstEntry().value
                 }.peerKey.peer
 
-                val forwarded = JoinRequest(type = Proxy(peerKeyLocation), hopsToLive = min(received.hopsToLive, maxHopsToLive) - 1)
+                val forwarded =
+                    JoinRequest(type = Proxy(peerKeyLocation), hopsToLive = min(received.hopsToLive, maxHopsToLive) - 1)
 
                 val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
-                acceptedBy?.let { forwardedAcceptors[it.peerKey] = Unit }
+                acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
 
                 cm.send<JoinResponse>(
-                        to = forwardTo,
-                        message = forwarded,
-                        retries = 3,
-                        retryDelay = Duration.ofMillis(200)
+                    to = forwardTo,
+                    message = forwarded,
+                    retries = 3,
+                    retryDelay = Duration.ofMillis(200)
                 ) {
-                    val newAcceptor = if (received.acceptedBy != null && received.acceptedBy !in forwardedAcceptors) received.acceptedBy else null
+                    val newAcceptor =
+                        if (received.acceptedBy != null && received.acceptedBy !in forwardedAcceptors) received.acceptedBy else null
                     if (newAcceptor != null) {
                         cm.send(joiner, JoinResponse(JoinResponse.Type.Proxy, acceptedBy = newAcceptor, received.id))
                     }
@@ -143,26 +147,30 @@ class RingProtocol(
     }
 
     private fun joinRing() {
-        for (gateway in gateways.toList().shuffled()) {
-            cm.addConnection(gateway, true)
-            cm.send<JoinResponse>(
+        if (cm.transport.isOpen && gateways.isEmpty()) {
+            logger.info { "No gateways to join through, but this is open so select own location" }
+            this.ring = Ring(Location(random.nextDouble()))
+        } else {
+            for (gateway in gateways.toList().shuffled()) {
+                cm.addConnection(gateway, true)
+                cm.send<JoinResponse>(
                     to = gateway.peer,
                     message = JoinRequest(Initial(cm.myKey.public), maxHopsToLive),
                     retries = 5,
                     retryDelay = Duration.ofSeconds(1)
-            ) {
-                when (val type = received.type) {
-                    is JoinResponse.Type.Initial -> {
-                        if (ring == null) {
-                            ring = Ring(type.yourLocation)
-                        }
-                        if (myPeerKeyLocation == null) {
-                            myPeerKeyLocation = PeerKeyLocation(type.yourExternalAddress, cm.myKey.public, type.yourLocation)
-                        }
-                        ring.let { ring ->
-                            requireNotNull(ring)
-                            received.acceptedBy.let { newPeer ->
-                                if (newPeer != null) {
+                ) {
+                    when (val type = received.type) {
+                        is JoinResponse.Type.Initial -> {
+                            if (ring == null) {
+                                ring = Ring(type.yourLocation)
+                            }
+                            if (myPeerKeyLocation == null) {
+                                myPeerKeyLocation =
+                                    PeerKeyLocation(type.yourExternalAddress, cm.myKey.public, type.yourLocation)
+                            }
+                            ring.let { ring ->
+                                requireNotNull(ring)
+                                received.acceptedBy.forEach { newPeer ->
                                     if (ring.shouldAccept(newPeer.location)) {
                                         scope.launch {
                                             establishConnection(newPeer)
@@ -171,9 +179,9 @@ class RingProtocol(
                                 }
                             }
                         }
-                    }
-                    else -> {
-                        logger.warn { "Gateway $gateway responded with incorrect message type $type" }
+                        else -> {
+                            logger.warn { "Gateway $gateway responded with incorrect message type $type" }
+                        }
                     }
                 }
             }
@@ -191,9 +199,9 @@ class RingProtocol(
         val ocReceived = AtomicBoolean(false)
         val connectionEstablished = AtomicBoolean(false)
         cm.listen(
-                Extractor<OpenConnection, Peer>("openConnection") { sender },
-                newPeer.peerKey.peer,
-                Duration.ofSeconds(30)
+            Extractor<OpenConnection, Peer>("openConnection") { sender },
+            newPeer.peerKey.peer,
+            Duration.ofSeconds(30)
         ) {
             if (received.isInitiate) {
                 ocReceived.set(true)
@@ -202,7 +210,7 @@ class RingProtocol(
                 ocReceived.set(true)
             }
         }
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             val giveUpTime: Instant = Instant.now() + Duration.ofSeconds(30)
             while (!connectionEstablished.get() && Instant.now() <= giveUpTime) {
                 cm.send(newPeer.peerKey.peer, OpenConnection(ocReceived.get()))

@@ -47,7 +47,7 @@ class Ring(val myLocation: Location) {
 
     private val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
 
-    private val medianDistanceToMe = connectionsByDistance(myLocation).keys.sorted().get(connectionsByLocation.size / 2)
+    private val medianDistanceToMe get() = connectionsByDistance(myLocation).keys.sorted().get(connectionsByLocation.size / 2)
 
     fun connectionsByDistance(to: Location): TreeMap<Double, PeerKeyLocation> {
         return TreeMap(connectionsByLocation.mapKeys { (location, _) ->

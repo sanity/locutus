@@ -1,4 +1,4 @@
-<configuration>
+<configuration debug="true">
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <!-- encoders are assigned the type
@@ -8,7 +8,13 @@
         </encoder>
     </appender>
 
-    <root level="debug">
+    <logger name="locutus.protocols.ring" level="debug" >
+        <appender-ref ref="STDOUT" />
+    </logger>
+
+    <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
+
+
 </configuration>
