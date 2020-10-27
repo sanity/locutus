@@ -24,8 +24,8 @@ dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.0-M1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.0-M1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.0")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.66")
     implementation("com.google.guava:guava:30.0-jre")

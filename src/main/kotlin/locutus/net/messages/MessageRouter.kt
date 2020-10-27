@@ -24,7 +24,7 @@ class MessageRouter {
             timeout: Duration?,
             noinline block: (MessageReceiver<MType>).() -> Unit
     ) {
-        logger.info("Add listener for ${MType::class}")
+        logger.info("Add listener for ${MType::class.simpleName}")
         listeners
                 .computeIfAbsent(MType::class) { ConcurrentHashMap() }
                 .computeIfAbsent(for_.label) { ConcurrentHashMap() }[key] = block as MessageReceiver<*>.() -> Unit
@@ -49,7 +49,7 @@ class MessageRouter {
     fun route(sender: Peer, message: Message) {
         val classListeners = listeners[message::class]
         if (classListeners == null) {
-            logger.warn("No listener found for message $message")
+            logger.info("No listener found for message type ${message::class.simpleName}")
             return
         }
         for ((extractorLabel, keys) in classListeners.entries) {

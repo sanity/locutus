@@ -34,6 +34,8 @@ data class Location(val value: Double) : Comparable<Location> {
     }
 
     override fun compareTo(other: Location): Int = value.compareTo(other.value)
+
+    override fun toString() = value.toString().substring(0, 4)
 }
 
 infix fun Location.distance(other : Location) : Double {

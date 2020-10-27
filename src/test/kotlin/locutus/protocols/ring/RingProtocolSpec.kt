@@ -1,6 +1,7 @@
 package locutus.protocols.ring
 
 import io.kotest.core.spec.style.FunSpec
+import kotlinx.coroutines.delay
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.PeerKey
@@ -13,7 +14,7 @@ class RingProtocolSpec : FunSpec({
     val networkSize = 2
     context("Given a SimulatedNetwork of $networkSize nodes") {
         val network = SimulatedNetwork()
-        val gateway1Transport = network.createTransport(true)
+        val gateway1Transport = network.createTransport(true, "gateway")
         val gateway1 = ConnectionManager(RSAKeyPair.create(), gateway1Transport)
         val gateway1PeerKey = PeerKey(gateway1Transport.peer, gateway1.myKey.public)
         RingProtocol(
@@ -27,10 +28,11 @@ class RingProtocolSpec : FunSpec({
             PeerKey(gateway1Transport.peer, gateway1.myKey.public),
         )
         for (nodeNo in 0 .. networkSize) {
-            val transport = network.createTransport(false)
+            val transport = network.createTransport(false, "node-$nodeNo")
             val connectionManager = ConnectionManager(RSAKeyPair.create(), transport)
             val ringProtocol = RingProtocol(connectionManager, gateways)
         }
+        delay(1000)
     }
 
 })

@@ -9,8 +9,8 @@ class SimulatedNetwork {
 
     val transports = ConcurrentHashMap<Int, SimulatedTransport>()
 
-    fun createTransport(isOpen : Boolean): SimulatedTransport {
-        val transport = SimulatedTransport(Peer(InetSocketAddress("localhost", portGenerator.getAndIncrement())), this, isOpen)
+    fun createTransport(isOpen : Boolean, peerLabel : String? = null): SimulatedTransport {
+        val transport = SimulatedTransport(Peer(InetSocketAddress("localhost", portGenerator.getAndIncrement()), peerLabel), this, isOpen)
         transports[transport.peer.port] = transport
         return transport
     }

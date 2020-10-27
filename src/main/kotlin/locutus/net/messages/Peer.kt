@@ -2,6 +2,7 @@
 
 package locutus.net.messages
 
+import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
@@ -10,9 +11,9 @@ import java.net.*
 import java.security.interfaces.RSAPublicKey
 
 @Serializable
-data class Peer(val addr: ByteArray, val port: Int) {
-    constructor(socketAddress: InetSocketAddress) :
-            this(socketAddress.address.address, socketAddress.port)
+data class Peer(val addr: ByteArray, val port: Int, val label : String? = null) {
+    constructor(socketAddress: InetSocketAddress, label : String? = null) :
+            this(socketAddress.address.address, socketAddress.port, label)
 
     val asSocketAddress: InetSocketAddress by lazy {
         InetSocketAddress(InetAddress.getByAddress(addr), port)
@@ -36,11 +37,15 @@ data class Peer(val addr: ByteArray, val port: Int) {
         return result
     }
 
-    override fun toString(): String = asSocketAddress.toString()
+    override fun toString(): String = label ?: asSocketAddress.toString()
 }
 
 @Serializable
-data class PeerKey(val peer: Peer, val key : RSAPublicKey)
+data class PeerKey(val peer: Peer, val key : RSAPublicKey) {
+    override fun toString(): String {
+        return peer.toString()
+    }
+}
 
 @Serializable
 data class PeerKeyLocation(val peerKey: PeerKey, val location : Location) {

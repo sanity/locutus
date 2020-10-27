@@ -100,6 +100,7 @@ class ConnectionManager(
     ): Connection {
         val (peer, pubKey) = peerKey
         withLoggingContext("peer" to peer.toString()) {
+            logger.info { "Adding connection to $peer" }
             if (connections.containsKey(peer)) {
                 logger.warn { "Connection to $peer already exists, won't add again" }
                 return connections.getValue(peer)
