@@ -2,6 +2,7 @@
 
 package locutus.net.messages
 
+import com.sun.tools.jconsole.JConsoleContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kweb.util.random
@@ -52,8 +53,12 @@ sealed class Message {
         }
 
         @Serializable
-        data class OpenConnection(val receivedYourOC : Boolean, val ackRequired : Boolean) : Message(), CanInitiate {
-            override val isInitiate = !receivedYourOC
+        data class OpenConnection(val myState : ConnectionState) : Message(), CanInitiate {
+            override val isInitiate = myState == ConnectionState.Connecting
+
+            @Serializable enum class ConnectionState {
+                Connecting, OCReceived, Connected
+            }
         }
 
         @Serializable

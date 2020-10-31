@@ -13,13 +13,15 @@ import locutus.net.messages.Message.Ring.JoinRequest.Type.Initial
 import locutus.net.messages.Message.Ring.JoinRequest.Type.Proxy
 import locutus.net.messages.Message.Ring.JoinResponse
 import locutus.net.messages.Message.Ring.OpenConnection
+import locutus.net.messages.Message.Ring.OpenConnection.ConnectionState
+import locutus.net.messages.Message.Ring.OpenConnection.ConnectionState.*
 import locutus.tools.math.Location
 import mu.KotlinLogging
 import mu.withLoggingContext
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.min
 
 class RingProtocol(
@@ -222,39 +224,44 @@ class RingProtocol(
             "newPeer" to newPeer.peerKey.peer.toString()
         ) {
             cm.addConnection(newPeer.peerKey, false)
-            val ocReceived = AtomicBoolean(false)
-            val connectionEstablished = AtomicBoolean(false)
+            val myState: AtomicReference<ConnectionState> = AtomicReference(Connecting)
             logger.info { "Sending OpenConnection" }
             cm.listen(
                 Extractor<OpenConnection, Peer>("openConnection") { sender },
                 newPeer.peerKey.peer,
                 Duration.ofSeconds(30)
             ) {
-                if (received.receivedYourOC) {
-                    logger.info { "Connection established" }
-                    ocReceived.set(true)
-                    connectionEstablished.set(true)
-                } else {
-                    logger.info { "OpenConnection received" }
-                    ocReceived.set(true)
+
+                when (received.myState) {
+                    Connecting -> {
+                        myState.set(OCReceived)
+                    }
+                    OCReceived -> {
+                        myState.set(Connected)
+                    }
+                    Connected -> {
+                        myState.set(Connected)
+                    }
                 }
-                if (received.ackRequired) {
+
+                if (received.myState != Connected) {
                     val openConnection =
-                        OpenConnection(receivedYourOC = ocReceived.get(), ackRequired = !connectionEstablished.get())
+                        OpenConnection(myState = myState.get())
                     logger.info { "Acklowledging OC: $openConnection" }
                     cm.send(newPeer.peerKey.peer, openConnection)
                 }
             }
+
             scope.launch(Dispatchers.IO) {
                 val giveUpTime: Instant = Instant.now() + Duration.ofSeconds(30)
-                while (!connectionEstablished.get() && Instant.now() <= giveUpTime) {
+                while (myState.get() != Connected && Instant.now() <= giveUpTime) {
                     val openConnection =
-                        OpenConnection(receivedYourOC = ocReceived.get(), ackRequired = !connectionEstablished.get())
+                        OpenConnection(myState = myState.get())
                     logger.info { "Sending $openConnection to $newPeer" }
                     cm.send(newPeer.peerKey.peer, openConnection)
                     delay(Duration.ofMillis(200))
                 }
-                if (connectionEstablished.get()) {
+                if (myState.get() == Connected) {
                     ring.let { ring ->
                         requireNotNull(ring)
                         logger.info { "${this@RingProtocol.myPeerKeyLocation?.peerKey?.peer} adding $newPeer to ring" }
