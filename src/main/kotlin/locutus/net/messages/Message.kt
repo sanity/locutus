@@ -52,7 +52,9 @@ sealed class Message {
         }
 
         @Serializable
-        data class OpenConnection(override val isInitiate: Boolean) : Message(), CanInitiate
+        data class OpenConnection(val receivedYourOC : Boolean, val ackRequired : Boolean) : Message(), CanInitiate {
+            override val isInitiate = !receivedYourOC
+        }
 
         @Serializable
         data class CloseConnection(val reason: String) : Message()

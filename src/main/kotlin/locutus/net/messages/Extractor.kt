@@ -24,4 +24,4 @@ class ReplyExtractor<MType : Message>(label: String) : Extractor<MType, PeerId>(
 
 }
 
-class PeerId(val peer : Peer, val id : MessageId)
+data class PeerId(val peer : Peer, val id : MessageId)

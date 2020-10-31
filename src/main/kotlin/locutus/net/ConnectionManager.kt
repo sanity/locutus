@@ -99,27 +99,25 @@ class ConnectionManager(
         unsolicited: Boolean
     ): Connection {
         val (peer, pubKey) = peerKey
-        withLoggingContext("peer" to peer.toString()) {
-            logger.info { "Adding connection to $peer" }
-            if (connections.containsKey(peer)) {
-                logger.warn { "Connection to $peer already exists, won't add again" }
-                return connections.getValue(peer)
-            } else {
-                logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
-                val outboundKey = AESKey.generate()
-                val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
-                val type = when (unsolicited) {
-                    true -> {
-                        Connection.Type.Outbound(pubKey, false, outboundKey, encryptedOutboundKey)
-                    }
-                    false -> {
-                        Connection.Type.Symmetric(pubKey, false, outboundKey, encryptedOutboundKey, null)
-                    }
+        logger.info { "Adding connection to $peer" }
+        if (connections.containsKey(peer)) {
+            logger.warn { "Connection to $peer already exists, won't add again" }
+            return connections.getValue(peer)
+        } else {
+            logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
+            val outboundKey = AESKey.generate()
+            val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
+            val type = when (unsolicited) {
+                true -> {
+                    Connection.Type.Outbound(pubKey, false, outboundKey, encryptedOutboundKey)
                 }
-                val connection = Connection(peer, type, null)
-                connections[peer] = connection
-                return connection
+                false -> {
+                    Connection.Type.Symmetric(pubKey, false, outboundKey, encryptedOutboundKey, null)
+                }
             }
+            val connection = Connection(peer, type, null)
+            connections[peer] = connection
+            return connection
         }
     }
 
@@ -195,7 +193,7 @@ class ConnectionManager(
             replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
         router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, {
             val xSender = sender
-            val xMessage: ReplyType = message as ReplyType // Not sure why this cast is necessary
+            val xMessage: ReplyType = received
             responseReceived.set(true)
             block(object : MessageReceiver<ReplyType> {
                 override val sender: Peer = xSender

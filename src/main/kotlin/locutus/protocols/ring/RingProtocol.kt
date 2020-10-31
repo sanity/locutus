@@ -36,7 +36,7 @@ class RingProtocol(
     private val logger = KotlinLogging.logger {}
 
     @Volatile
-    private var ring: Ring? = myPeerKeyLocation.let { pcl ->
+    var ring: Ring? = myPeerKeyLocation.let { pcl ->
         if (pcl == null) null else Ring(pcl.location)
     }
 
@@ -77,34 +77,34 @@ class RingProtocol(
                 key = Unit,
                 timeout = NEVER
             ) {
-                val joiner = sender
-                logger.debug { "JoinRequest received from $joiner" }
+                //  val joiner = sender
+                logger.info { "JoinRequest received from $sender with HTL ${this.received.hopsToLive} of type ${received.type::class.simpleName}" }
                 val ring = ring
                 requireNotNull(ring)
                 val myPeerKeyLocation = myPeerKeyLocation
                 requireNotNull(myPeerKeyLocation)
 
                 val peerKeyLocation: PeerKeyLocation
-                val replyType: JoinResponse.Type
                 logger.debug { "JoinRequest type is ${received.type::class.simpleName}" }
-                when (val type = received.type) {
+                val replyType = when (val type = received.type) {
                     is Initial -> {
                         peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
-                        replyType = JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
-                        cm.send(sender, JoinResponse(type = replyType, replyTo = received.id))
+                        JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
                     }
                     is Proxy -> {
                         peerKeyLocation = type.joiner
-                        replyType = JoinResponse.Type.Proxy
+                        JoinResponse.Type.Proxy
                     }
                 }
 
                 val acceptedBy: Set<PeerKeyLocation> = if (ring.shouldAccept(peerKeyLocation.location)) {
+                    logger.info { "Accepting connection to ${peerKeyLocation.peerKey.peer}, establishing connection" }
                     scope.launch(Dispatchers.IO) {
                         establishConnection(peerKeyLocation)
                     }
                     setOf(myPeerKeyLocation)
                 } else {
+                    logger.info { "Not accepting new connection from ${peerKeyLocation.peerKey.peer}" }
                     emptySet()
                 }
 
@@ -113,6 +113,7 @@ class RingProtocol(
                     acceptedBy = acceptedBy,
                     replyTo = received.id
                 )
+                logger.info { "Sending joinResponse to $sender accepting ${acceptedBy.size} connections." }
                 cm.send(sender, joinResponse)
 
                 if (received.hopsToLive > 0) {
@@ -140,13 +141,13 @@ class RingProtocol(
                         ) {
                             for (newAcceptor in received.acceptedBy.filter { it !in forwardedAcceptors }) {
                                 cm.send(
-                                    joiner,
+                                    sender,
                                     JoinResponse(JoinResponse.Type.Proxy, acceptedBy = setOf(newAcceptor), received.id)
                                 )
                             }
                         }
                     } else {
-                        logger.warn { "Unable to forward message from $sender because Ring is empty" }
+                        logger.warn { "Unable to forward message from $sender with HTL ${received.hopsToLive} because Ring is empty" }
                     }
                 }
             }
@@ -167,12 +168,15 @@ class RingProtocol(
                 for (gateway in gateways.toList().shuffled()) {
                     logger.info { "Joining Ring via $gateway" }
                     cm.addConnection(gateway, true)
+                    val joinRequest = JoinRequest(Initial(cm.myKey.public), maxHopsToLive)
+                    logger.info { "Sending JoinRequest(id=${joinRequest.id}) to ${gateway.peer}" }
                     cm.send<JoinResponse>(
                         to = gateway.peer,
-                        message = JoinRequest(Initial(cm.myKey.public), maxHopsToLive),
+                        message = joinRequest,
                         retries = 5,
                         retryDelay = Duration.ofSeconds(1)
                     ) {
+                        logger.info { "JoinResponse received from $sender of type ${received.type::class.simpleName}" }
                         when (val type = received.type) {
                             is JoinResponse.Type.Initial -> {
                                 if (ring == null) {
@@ -181,14 +185,18 @@ class RingProtocol(
                                 if (myPeerKeyLocation == null) {
                                     myPeerKeyLocation =
                                         PeerKeyLocation(type.yourExternalAddress, cm.myKey.public, type.yourLocation)
+                                    logger.info { "Gateway has informed me that my PeerKeyLocation is $myPeerKeyLocation" }
                                 }
                                 ring.let { ring ->
                                     requireNotNull(ring)
                                     received.acceptedBy.forEach { newPeer ->
                                         if (ring.shouldAccept(newPeer.location)) {
-                                            scope.launch {
+                                            logger.info { "Joiner establishing connection to $newPeer" }
+                                            scope.launch(Dispatchers.IO) {
                                                 establishConnection(newPeer)
                                             }
+                                        } else {
+                                            logger.info { "Not accepting connection to $newPeer" }
                                         }
                                     }
                                 }
@@ -209,17 +217,20 @@ class RingProtocol(
      * sending.
      */
     private suspend fun establishConnection(newPeer: PeerKeyLocation) {
-        withLoggingContext("me" to this.myPeerKeyLocation?.peerKey?.peer.toString()) {
-            logger.info { "Establishing connection to $newPeer" }
+        withLoggingContext(
+            "me" to this.myPeerKeyLocation?.peerKey?.peer.toString(),
+            "newPeer" to newPeer.peerKey.peer.toString()
+        ) {
             cm.addConnection(newPeer.peerKey, false)
             val ocReceived = AtomicBoolean(false)
             val connectionEstablished = AtomicBoolean(false)
+            logger.info { "Sending OpenConnection" }
             cm.listen(
                 Extractor<OpenConnection, Peer>("openConnection") { sender },
                 newPeer.peerKey.peer,
                 Duration.ofSeconds(30)
             ) {
-                if (received.isInitiate) {
+                if (received.receivedYourOC) {
                     logger.info { "Connection established" }
                     ocReceived.set(true)
                     connectionEstablished.set(true)
@@ -227,17 +238,26 @@ class RingProtocol(
                     logger.info { "OpenConnection received" }
                     ocReceived.set(true)
                 }
+                if (received.ackRequired) {
+                    val openConnection =
+                        OpenConnection(receivedYourOC = ocReceived.get(), ackRequired = !connectionEstablished.get())
+                    logger.info { "Acklowledging OC: $openConnection" }
+                    cm.send(newPeer.peerKey.peer, openConnection)
+                }
             }
             scope.launch(Dispatchers.IO) {
                 val giveUpTime: Instant = Instant.now() + Duration.ofSeconds(30)
                 while (!connectionEstablished.get() && Instant.now() <= giveUpTime) {
-                    cm.send(newPeer.peerKey.peer, OpenConnection(ocReceived.get()))
+                    val openConnection =
+                        OpenConnection(receivedYourOC = ocReceived.get(), ackRequired = !connectionEstablished.get())
+                    logger.info { "Sending $openConnection to $newPeer" }
+                    cm.send(newPeer.peerKey.peer, openConnection)
                     delay(Duration.ofMillis(200))
                 }
                 if (connectionEstablished.get()) {
                     ring.let { ring ->
                         requireNotNull(ring)
-                        logger.info { "Add $newPeer to ring" }
+                        logger.info { "${this@RingProtocol.myPeerKeyLocation?.peerKey?.peer} adding $newPeer to ring" }
                         ring += newPeer
                     }
                 }

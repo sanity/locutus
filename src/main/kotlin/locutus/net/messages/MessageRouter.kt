@@ -7,6 +7,7 @@ import kotlinx.coroutines.time.delay
 import mu.KotlinLogging
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.reflect.KClass
 
 @PublishedApi internal val logger = KotlinLogging.logger {}
@@ -52,14 +53,21 @@ class MessageRouter {
             logger.info("No listener found for message type ${message::class.simpleName}")
             return
         }
+        val messageHandled = AtomicBoolean(false)
         for ((extractorLabel, keys) in classListeners.entries) {
             val extractor = extractors[extractorLabel]
             requireNotNull(extractor) { "No extractor found for label $extractorLabel" }
             val receiver = keys[extractor.extractor.invoke(SenderMessage(sender, message))]
-            receiver?.invoke(object : MessageReceiver<Message> {
-                override val sender = sender
-                override val received: Message = message
-            })
+            receiver?.let { receiver ->
+                messageHandled.set(true)
+                receiver.invoke(object : MessageReceiver<Message> {
+                    override val sender = sender
+                    override val received: Message = message
+                })
+            }
+        }
+        if (!messageHandled.get()) {
+            logger.warn { "No listener found for message: $message" }
         }
     }
 

@@ -45,7 +45,7 @@ class Ring(val myLocation: Location) {
 
     fun randomPeer() = connectionsByLocation.values.randomOrNull()
 
-    private val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
+    val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
 
     private val medianDistanceToMe get() = connectionsByDistance(myLocation).keys.sorted().get(connectionsByLocation.size / 2)
 
