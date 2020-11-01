@@ -101,7 +101,7 @@ class ConnectionManager(
         val (peer, pubKey) = peerKey
         logger.info { "Adding connection to $peer" }
         if (connections.containsKey(peer)) {
-            logger.warn { "Connection to $peer already exists, won't add again" }
+            logger.debug { "Connection to $peer already exists, won't add again" }
             return connections.getValue(peer)
         } else {
             logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
@@ -246,7 +246,7 @@ class ConnectionManager(
                 connection == null -> {
                     logger.debug { "Packet received from unknown sender" }
                     if (!transport.isOpen) {
-                        logger.warn("Disregarding packet from unknown sender because I'm not open")
+                        logger.info("Disregarding packet from unknown sender because I'm not open")
                         return
                     }
                     logger.debug { "Packet received from unknown sender, assume its prepended, extract and use" }

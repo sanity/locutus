@@ -43,7 +43,11 @@ class Ring(val myLocation: Location) {
         }
     }
 
-    fun randomPeer() = connectionsByLocation.values.randomOrNull()
+    fun randomPeer(exclude : List<(PeerKeyLocation) -> Boolean>) =
+        connectionsByLocation
+            .values
+            .filter { exclude.none { filter -> filter(it) } }
+            .randomOrNull()
 
     val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
 

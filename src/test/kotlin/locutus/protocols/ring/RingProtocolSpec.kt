@@ -3,7 +3,6 @@ package locutus.protocols.ring
 import io.kotest.assertions.timing.eventually
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.delay
 import kweb.util.random
 import locutus.net.ConnectionManager
@@ -12,17 +11,18 @@ import locutus.net.messages.PeerKeyLocation
 import locutus.net.sim.SimulatedNetwork
 import locutus.tools.crypto.rsa.RSAKeyPair
 import locutus.tools.math.Location
+import mu.KotlinLogging
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
-import java.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
+
+private val logger = KotlinLogging.logger {}
 
 @ExperimentalTime
 class RingProtocolSpec : FunSpec({
     context("Given a SimulatedNetwork of one node and one gateway") {
-        val networkSize = 1
         val ringProtocols = buildNetwork(
-            networkSize = networkSize,
+            networkSize = 1,
             maxHopsToLive = 1,
             randomRouteHTL = 0
         )
@@ -39,9 +39,21 @@ class RingProtocolSpec : FunSpec({
         }
     }
 
+    context("Given a SimulatedNetwork of 10 nodes and one gateway") {
+        val ringProtocols = buildNetwork(
+            networkSize = 10,
+            maxHopsToLive = 7,
+            randomRouteHTL = 2
+        )
+
+        test("All nodes should connect") {
+
+        }
+    }
+
 })
 
-private fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRouteHTL : Int): ConcurrentHashMap<String, RingProtocol> {
+private suspend fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRouteHTL : Int): ConcurrentHashMap<String, RingProtocol> {
     val network = SimulatedNetwork()
     val ringProtocols = ConcurrentHashMap<String, RingProtocol>()
     val gateway1Transport = network.createTransport(true, "gateway")
@@ -60,6 +72,7 @@ private fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRouteHTL :
         PeerKey(gateway1Transport.peer, gateway1.myKey.public),
     )
     for (nodeNo in 0 until networkSize) {
+        logger.info {"Create node $nodeNo"}
         val peerLabel = "node-$nodeNo"
         val transport = network.createTransport(false, peerLabel)
         val connectionManager = ConnectionManager(RSAKeyPair.create(), transport)
@@ -69,6 +82,8 @@ private fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRouteHTL :
             randomRouteHTL = randomRouteHTL
         )
         ringProtocols[peerLabel] = ringProtocol
+
+        delay(1000)
     }
     return ringProtocols
 }

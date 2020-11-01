@@ -12,10 +12,6 @@
         <appender-ref ref="STDOUT" />
     </logger>
 
-    <logger name="locutus.net.messages" level="info">
-        <appender-ref ref="STDOUT" />
-    </logger>
-
     <root level="warn">
         <appender-ref ref="STDOUT" />
     </root>
