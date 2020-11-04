@@ -119,10 +119,16 @@ class RingProtocol(
                 cm.send(sender, joinResponse)
 
                 if (received.hopsToLive > 0) {
+                    // TODO: Need unified way to exclude peers from consideration
                     val forwardTo = if (received.hopsToLive >= randomRouteHTL) {
-                        ring.randomPeer()
+                        ring.randomPeer(exclude = listOf {
+                            it.peerKey.peer == sender
+                        })
                     } else {
-                        ring.connectionsByDistance(peerKeyLocation.location).firstEntry().value
+                        ring.connectionsByDistance(peerKeyLocation.location)
+                            .filterValues { it.peerKey.peer != sender }
+                            .entries
+                            .first().value
                     }?.peerKey?.peer
 
                     if (forwardTo != null) {
