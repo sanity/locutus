@@ -29,3 +29,14 @@ Accounts could optionally be "recordless", maintaining only a *validated* summar
 Threat:
 Network could be disconnected, resulting in possible double-spend.
 FairShare could be required to validate each transaction in realtime
+
+
+* Trust as profit model, use FairShare idea to reward early "trusters".
+* Trust can be labeled with arbitrary data, but with recommended labels
+  * Recommended labels to use can themselves be based on trust
+* Contracts are specified as content restricted HTML, but with custom
+  additions to do things like:
+    * Specify that a <textarea data-locutus-pubkey> contains a public key
+    * For a textarea containing a public key, specify what to do with it, eg. encrypt
+    * For a button specify whether to increase or decrease trust and the type of trust
+    
