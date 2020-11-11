@@ -39,4 +39,8 @@ FairShare could be required to validate each transaction in realtime
     * Specify that a <textarea data-locutus-pubkey> contains a public key
     * For a textarea containing a public key, specify what to do with it, eg. encrypt
     * For a button specify whether to increase or decrease trust and the type of trust
-    
+
+
+Trust bootstrapping
+
+Publish catalog of items to sell
