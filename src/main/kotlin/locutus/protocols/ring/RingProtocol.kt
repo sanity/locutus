@@ -79,7 +79,9 @@ class RingProtocol(
                 key = Unit,
                 timeout = NEVER
             ) {
-                //  val joiner = sender
+                val joinRequestSender = sender
+                val joinRequestId = received.id
+
                 logger.debug { "JoinRequest received from $sender with HTL ${this.received.hopsToLive} of type ${received.type::class.simpleName}" }
                 val ring = ring
                 requireNotNull(ring)
@@ -113,18 +115,20 @@ class RingProtocol(
                 val joinResponse = JoinResponse(
                     type = replyType,
                     acceptedBy = acceptedBy,
-                    replyTo = received.id
+                    replyTo = joinRequestId
                 )
                 logger.debug { "Sending joinResponse to $sender accepting ${acceptedBy.size} connections." }
-                cm.send(sender, joinResponse)
+                cm.send(joinRequestSender, joinResponse)
 
-                if (received.hopsToLive > 0) {
+                if (received.hopsToLive > 0 && ring.connectionsByLocation.size > 0) {
                     // TODO: Need unified way to exclude peers from consideration
                     val forwardTo = if (received.hopsToLive >= randomRouteHTL) {
+                        logger.info { "Randomly selecting peer to forward JoinRequest from $sender to" }
                         ring.randomPeer(exclude = listOf {
                             it.peerKey.peer == sender
                         })
                     } else {
+                        logger.info { "Selecting closest peer to forward request from $sender" }
                         ring.connectionsByDistance(peerKeyLocation.location)
                             .filterValues { it.peerKey.peer != sender }
                             .entries
@@ -141,22 +145,23 @@ class RingProtocol(
                         val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
                         acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
 
+                        logger.info { "Forwarding JoinRequest from $sender to $forwardTo" }
                         cm.send<JoinResponse>(
                             to = forwardTo,
                             message = forwarded,
                             retries = 3,
                             retryDelay = Duration.ofMillis(200)
                         ) {
-                            for (newAcceptor in received.acceptedBy.filter { it !in forwardedAcceptors }) {
-                                cm.send(
-                                    sender,
-                                    JoinResponse(JoinResponse.Type.Proxy, acceptedBy = setOf(newAcceptor), received.id)
-                                )
-                            }
+                            val newAcceptors = received.acceptedBy.filter { it !in forwardedAcceptors }.toSet()
+                            newAcceptors.forEach { forwardedAcceptors[it.peerKey] = Unit }
+                            cm.send(
+                                joinRequestSender,
+                                JoinResponse(JoinResponse.Type.Proxy, acceptedBy = newAcceptors, joinRequestId)
+                            )
                         }
-                    } else {
-                        logger.debug { "Unable to forward message from $sender with HTL ${received.hopsToLive} because Ring is empty" }
                     }
+                } else {
+                    logger.warn { "Unable to forward message from $sender with HTL ${received.hopsToLive} because Ring is empty" }
                 }
             }
         }
@@ -194,22 +199,19 @@ class RingProtocol(
                                         PeerKeyLocation(type.yourExternalAddress, cm.myKey.public, type.yourLocation)
                                     logger.info { "Gateway has informed me that my PeerKeyLocation is $myPeerKeyLocation" }
                                 }
-                                ring.let { ring ->
-                                    requireNotNull(ring)
-                                    received.acceptedBy.forEach { newPeer ->
-                                        if (ring.shouldAccept(newPeer.location)) {
-                                            logger.debug { "Joiner establishing connection to $newPeer" }
-                                            scope.launch(Dispatchers.IO) {
-                                                establishConnection(newPeer)
-                                            }
-                                        } else {
-                                            logger.debug { "Not accepting connection to $newPeer" }
-                                        }
-                                    }
-                                }
                             }
-                            else -> {
-                                logger.warn { "Gateway $gateway responded with incorrect message type $type" }
+                        }
+                        ring.let { ring ->
+                            requireNotNull(ring)
+                            received.acceptedBy.forEach { newPeer ->
+                                if (ring.shouldAccept(newPeer.location)) {
+                                    logger.info { "Establishing connection to $newPeer" }
+                                    scope.launch(Dispatchers.IO) {
+                                        establishConnection(newPeer)
+                                    }
+                                } else {
+                                    logger.debug { "Not accepting connection to $newPeer" }
+                                }
                             }
                         }
                     }

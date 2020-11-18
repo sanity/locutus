@@ -48,7 +48,9 @@ sealed class Message {
                 @Serializable
                 data class Initial(val yourExternalAddress: Peer, val yourLocation: Location) : Type()
                 @Serializable
-                object Proxy : Type()
+                object Proxy : Type() {
+                    override fun toString() = "Proxy"
+                }
             }
         }
 

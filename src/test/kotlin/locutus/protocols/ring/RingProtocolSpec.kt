@@ -39,11 +39,11 @@ class RingProtocolSpec : FunSpec({
         }
     }
 
-    context("Given a SimulatedNetwork of 10 nodes and one gateway") {
+    context("Given one gateway through which 10 nodes will join") {
         val ringProtocols = buildNetwork(
             networkSize = 10,
-            maxHopsToLive = 7,
-            randomRouteHTL = 2
+            maxHopsToLive = 3,
+            randomRouteHTL = 1
         )
 
         test("All nodes should connect") {
@@ -53,7 +53,7 @@ class RingProtocolSpec : FunSpec({
 
 })
 
-private suspend fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRouteHTL : Int): ConcurrentHashMap<String, RingProtocol> {
+private suspend fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRouteHTL : Int, perNodeDelay : Long = 200): ConcurrentHashMap<String, RingProtocol> {
     val network = SimulatedNetwork()
     val ringProtocols = ConcurrentHashMap<String, RingProtocol>()
     val gateway1Transport = network.createTransport(true, "gateway")
@@ -83,7 +83,7 @@ private suspend fun buildNetwork(networkSize: Int, maxHopsToLive : Int, randomRo
         )
         ringProtocols[peerLabel] = ringProtocol
 
-        delay(1000)
+        delay(perNodeDelay)
     }
     return ringProtocols
 }
