@@ -106,7 +106,11 @@ class ConnectionManager(
         } else {
             logger.info { "Adding ${if (unsolicited) "outbound" else "symmetric"} connection to $peer" }
             val outboundKey = AESKey.generate()
+            val outboundKeyBytes = outboundKey.bytes
+            require(outboundKeyBytes.size == AESKey.KEY_SIZE_BYTES) { "Outbound key size should be ${AESKey.KEY_SIZE_BYTES} bytes, but was ${outboundKeyBytes.size} bytes" }
             val encryptedOutboundKey = pubKey.encrypt(outboundKey.bytes).ciphertext
+            require(encryptedOutboundKey.size == AESKey.RSA_ENCRYPTED_SIZE) { "Expected encryptedOutboundKey.size to be ${AESKey.RSA_ENCRYPTED_SIZE} bytes, but was ${encryptedOutboundKey.size} bytes" }
+            logger.info { "EncryptedOutboundKey size is ${encryptedOutboundKey.size}" }
             val type = when (unsolicited) {
                 true -> {
                     Connection.Type.Outbound(pubKey, false, outboundKey, encryptedOutboundKey)

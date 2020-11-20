@@ -16,6 +16,6 @@ class SimulatedTransport internal constructor(val peer: Peer, val network: Simul
         }
     }
 
-    override val recepient: Channel<Pair<Peer, ByteArray>> = Channel(capacity = 100)
+    override val recepient: Channel<Pair<Peer, ByteArray>> = Channel(capacity = Channel.UNLIMITED)
 }
 

@@ -39,9 +39,10 @@ class RingProtocolSpec : FunSpec({
         }
     }
 
-    context("Given one gateway through which 10 nodes will join") {
+    val nodeCount = 10000
+    context("Given one gateway through which a large number of nodes will join") {
         val ringProtocols = buildNetwork(
-            networkSize = 10,
+            networkSize = nodeCount,
             maxHopsToLive = 3,
             randomRouteHTL = 1
         )

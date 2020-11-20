@@ -1,4 +1,4 @@
-package locutus.tools.crypto
+package locutus.tools.crypto.rsa
 
 import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
@@ -8,7 +8,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.serialization.protobuf.ProtoNumber
-import locutus.tools.crypto.rsa.*
+import locutus.tools.crypto.AESKey
 import java.nio.charset.Charset
 
 @ExperimentalSerializationApi
@@ -51,5 +51,15 @@ class RSASpec : FunSpec({
         val deserialized: Foo = ProtoBuf.decodeFromByteArray(Foo.serializer(), serialized)
 
         deserialized shouldBe foo
+    }
+
+    xtest("RSA AES encrypt-decrypt") {
+        for (x in 0 .. 1000) {
+            val keyPair = RSAKeyPair.create()
+            val aesKey = AESKey.generate()
+            val encrypted = keyPair.public.encrypt(aesKey.bytes).ciphertext
+            val decrypted = keyPair.private.decrypt(RSAEncrypted(encrypted))
+            decrypted shouldBe aesKey.bytes
+        }
     }
 })

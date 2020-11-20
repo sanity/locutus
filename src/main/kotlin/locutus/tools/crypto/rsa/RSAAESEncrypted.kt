@@ -1,7 +1,7 @@
 package locutus.tools.crypto.rsa
 
 import kotlinx.serialization.Serializable
-
+/*
 @Serializable
 data class RSAAESEncrypted(val encryptedAESKey: RSAEncrypted, val rsaEncryptedData : ByteArray) {
     override fun equals(other: Any?): Boolean {
@@ -21,4 +21,4 @@ data class RSAAESEncrypted(val encryptedAESKey: RSAEncrypted, val rsaEncryptedDa
         result = 31 * result + rsaEncryptedData.contentHashCode()
         return result
     }
-}
+}*/

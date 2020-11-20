@@ -11,6 +11,10 @@ import javax.crypto.spec.SecretKeySpec
 
 @Serializable class AESKey(val bytes: ByteArray) {
 
+    init {
+        require(bytes.size == KEY_SIZE_BYTES) { "Expected key to be $KEY_SIZE_BYTES bytes, but was ${bytes.size} bytes" }
+    }
+
     companion object {
         private const val CIPHER_NAME = "AES/CBC/PKCS7Padding"
 

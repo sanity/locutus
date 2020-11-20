@@ -45,26 +45,20 @@ data class RSAEncrypted(val ciphertext : ByteArray) {
 }
 
 fun RSAPublicKey.encrypt(toEncrypt : ByteArray) : RSAEncrypted {
-    val cipher = Cipher.getInstance("RSA/None/NoPadding", "BC")
+    val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC")
     cipher.init(Cipher.ENCRYPT_MODE, this)
     return RSAEncrypted(cipher.doFinal(toEncrypt))
 }
 
 fun RSAPrivateKey.decrypt(ciphertext : RSAEncrypted) : ByteArray {
-    val cipher = Cipher.getInstance("RSA/None/NoPadding", "BC")
+    val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC")
     cipher.init(Cipher.DECRYPT_MODE, this)
     return cipher.doFinal(ciphertext.ciphertext)
 }
-
-fun RSAPublicKey.encryptWithAes(data : ByteArray) : RSAAESEncrypted {
-    val aesKey = AESKey.generate()
-    val encryptedData = aesKey.encrypt(data)
-    val encryptedKey = this.encrypt(aesKey.bytes)
-    return RSAAESEncrypted(encryptedKey, encryptedData)
-}
-
+/*
 fun RSAPrivateKey.decrypt(encrypted : RSAAESEncrypted) : ByteArray {
     val aesKey = AESKey(this.decrypt(encrypted.encryptedAESKey))
     return aesKey.decrypt(encrypted.rsaEncryptedData)
 }
 
+*/
