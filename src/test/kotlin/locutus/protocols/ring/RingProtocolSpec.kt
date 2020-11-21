@@ -3,6 +3,7 @@ package locutus.protocols.ring
 import io.kotest.assertions.timing.eventually
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.delay
 import kweb.util.random
 import locutus.net.ConnectionManager
@@ -13,6 +14,7 @@ import locutus.tools.crypto.rsa.RSAKeyPair
 import locutus.tools.math.Location
 import mu.KotlinLogging
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
+import java.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.seconds
 
@@ -39,16 +41,23 @@ class RingProtocolSpec : FunSpec({
         }
     }
 
-    val nodeCount = 10000
-    context("Given one gateway through which a large number of nodes will join") {
+    context("Given a network of 1000 peers") {
         val ringProtocols = buildNetwork(
-            networkSize = nodeCount,
-            maxHopsToLive = 3,
-            randomRouteHTL = 1
+            networkSize = 100,
+            maxHopsToLive = 7,
+            randomRouteHTL = 2
         )
 
-        test("All nodes should connect") {
-
+        test("All nodes should have connections") {
+            eventually(20.seconds, 2.seconds) {
+                ringProtocols.values.forEach { ringProtocol ->
+                    ringProtocol.ring.let { ring ->
+                        ring shouldNotBe null
+                        requireNotNull(ring)
+                        ring.connectionsByLocation.isNotEmpty() shouldBe true
+                    }
+                }
+            }
         }
     }
 
