@@ -140,7 +140,7 @@ class ConnectionManager(
     fun send(to: Peer, message: Message) {
         logger.debug { "Sending $message to $to" }
         val connection = connections[to]
-        requireNotNull(connection)
+        requireNotNull(connection) { "Trying to send ${message::class.simpleName} to $to, but it's not connected" }
         val serializedMessage = protoBuf.encodeToByteArray(Message.serializer(), message)
         connection.type.let { connectionType ->
             val symKey: AESKey = when (connectionType) {
@@ -282,6 +282,7 @@ class ConnectionManager(
                 }
 
                 connection.type.decryptKey != null -> {
+                    require(knownSymKeyPrefix == null || !rawPacket.startsWith(knownSymKeyPrefix)) { "Packet starts with knownSymKeyPrefix but shouldn't" }
                     logger.debug { "Packet received, decrypt key is known and isn't prepended, assume entire packet is payload" }
                     connection.type.decryptKey?.decrypt(rawPacket)
                         ?: error("connection.type.decryptKey shouldn't be null")

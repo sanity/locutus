@@ -10,7 +10,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentSkipListMap
 
 
-class Ring(val myLocation: Location) {
+class Ring {
 
     companion object {
         private val logger = KotlinLogging.logger {}
@@ -20,17 +20,22 @@ class Ring(val myLocation: Location) {
 
     val maxConnections = KVar(20)
 
-    fun shouldAccept(location: Location): Boolean {
+    fun shouldAccept(myLocation: Location, location: Location): Boolean {
         return when {
+            location == myLocation -> false
+            location in connectionsByLocation -> false
             connectionsByLocation.size < minConnections.value -> true
             connectionsByLocation.size >= maxConnections.value -> false
             // Placeholder for a smarter algorithm
-            myLocation distance location < medianDistanceToMe -> true
+            myLocation distance location < medianDistanceTo(myLocation) -> true
             else -> false
         }
     }
 
     operator fun plusAssign(newPeer: PeerKeyLocation) {
+        if (connectionsByLocation.containsKey(newPeer.location)) {
+            logger.warn { "Adding $newPeer but peer with this location already in ring" }
+        }
         connectionsByLocation[newPeer.location] = newPeer
     }
 
@@ -51,7 +56,7 @@ class Ring(val myLocation: Location) {
 
     val connectionsByLocation = ConcurrentSkipListMap<Location, PeerKeyLocation>()
 
-    private val medianDistanceToMe get() = connectionsByDistance(myLocation).keys.sorted().get(connectionsByLocation.size / 2)
+    private fun medianDistanceTo(location: Location) = connectionsByDistance(location).keys.sorted().get(connectionsByLocation.size / 2)
 
     fun connectionsByDistance(to: Location): TreeMap<Double, PeerKeyLocation> {
         return TreeMap(connectionsByLocation.mapKeys { (location, _) ->

@@ -67,6 +67,17 @@ sealed class Message {
         data class CloseConnection(val reason: String) : Message()
     }
 
+    object Probe {
+        @Serializable
+        data class ProbeRequest(val target : Location, val hopsToLive: Int) : Message()
+
+        @Serializable
+        data class ProbeResponse(val visits : List<Visit>, override val replyTo: MessageId) : Message(), Reply {
+            @Serializable
+            data class Visit(val hop : Int, val latency : Long, val location : Location)
+        }
+    }
+
     object Testing {
         @Serializable
         data class FooMessage(val v: Int, override val isInitiate: Boolean) : Message(), CanInitiate

@@ -2,17 +2,18 @@
 
 package locutus.net.messages
 
-import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
-import java.net.*
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.security.interfaces.RSAPublicKey
+import java.text.DecimalFormat
 
 @Serializable
-data class Peer(val addr: ByteArray, val port: Int, val label : String? = null) {
-    constructor(socketAddress: InetSocketAddress, label : String? = null) :
+data class Peer(val addr: ByteArray, val port: Int, val label: String? = null) {
+    constructor(socketAddress: InetSocketAddress, label: String? = null) :
             this(socketAddress.address.address, socketAddress.port, label)
 
     val asSocketAddress: InetSocketAddress by lazy {
@@ -41,14 +42,26 @@ data class Peer(val addr: ByteArray, val port: Int, val label : String? = null) 
 }
 
 @Serializable
-data class PeerKey(val peer: Peer, val key : RSAPublicKey) {
+data class PeerKey(val peer: Peer, val key: RSAPublicKey) {
     override fun toString(): String {
         return peer.toString()
     }
 }
 
 @Serializable
-data class PeerKeyLocation(val peerKey: PeerKey, val location : Location) {
-    constructor(peer : Peer, key : RSAPublicKey, location : Location) :
+data class PeerKeyLocation(val peerKey: PeerKey, val location: Location) {
+    companion object {
+        private val locationFormat = DecimalFormat("#.000")
+    }
+
+    constructor(peer: Peer, key: RSAPublicKey, location: Location) :
             this(PeerKey(peer, key), location)
+
+    override fun toString(): String {
+        return if (peerKey.peer.label != null) {
+            "${peerKey.peer.label}(${ locationFormat.format(location.value)})"
+        } else {
+            super.toString()
+        }
+    }
 }

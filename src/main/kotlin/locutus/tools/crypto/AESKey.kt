@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec
         const val KEY_SIZE_BYTES = 16
         const val RSA_ENCRYPTED_SIZE = 256
 
-        val blockSize: Int = run {
+        val blockSize: Int by lazy {
             Cipher.getInstance(CIPHER_NAME).blockSize
         }
 

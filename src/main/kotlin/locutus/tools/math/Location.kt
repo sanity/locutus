@@ -3,6 +3,7 @@ package locutus.tools.math
 import kotlinx.serialization.Serializable
 import locutus.tools.crypto.hash
 import java.security.interfaces.RSAPublicKey
+import java.text.DecimalFormat
 import kotlin.math.abs
 
 @Serializable
@@ -13,6 +14,10 @@ data class Location(val value: Double) : Comparable<Location> {
     }
 
     companion object {
+
+        fun random() : Location {
+            return Location(kweb.util.random.nextDouble())
+        }
 
         @ExperimentalUnsignedTypes
         fun fromByteArray(ba: UByteArray, precision: Int = 7): Location {
@@ -31,11 +36,13 @@ data class Location(val value: Double) : Comparable<Location> {
         fun fromRSAPublicKey(pubKey: RSAPublicKey, label: String): Location {
             return fromByteArray((pubKey.encoded + label.toByteArray(Charsets.UTF_8)).hash().toUByteArray())
         }
+
+        val decimalFormat = DecimalFormat("#.###")
     }
 
     override fun compareTo(other: Location): Int = value.compareTo(other.value)
 
-    override fun toString() = value.toString().substring(0, 4)
+    override fun toString() : String = decimalFormat.format(value)
 }
 
 infix fun Location.distance(other : Location) : Double {
