@@ -194,10 +194,6 @@ class RingProtocol(
         }
     }
 
-    suspend fun <S : Any, C : Contract<S, C>> search(key: Key<S, C>) {
-
-    }
-
     private fun joinRing() {
         withLoggingContext("me" to this.myPeerKey?.peer.toString()) {
             if (cm.transport.isOpen && gateways.isEmpty()) {
