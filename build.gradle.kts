@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.4.20"
-    kotlin("plugin.serialization") version "1.4.20"
+    kotlin("jvm") version "1.4.21"
+    kotlin("plugin.serialization") version "1.4.21"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.33.0"
@@ -29,12 +29,12 @@ dependencies {
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.66")
     implementation("com.google.guava:guava:30.0-jre")
-    implementation("io.github.microutils:kotlin-logging:2.0.3")
 
     implementation("com.github.kwebio:kweb-core:0.7.33")
 
     implementation("org.mapdb:mapdb:3.0.8")
 
+    implementation("io.github.microutils:kotlin-logging:2.0.3")
     implementation("ch.qos.logback:logback-classic:1.3.0-alpha5")
 
     implementation("org.koin:koin-core:2.1.6")
@@ -45,16 +45,6 @@ dependencies {
 
 
 }
-
-tasks {
-    compileKotlin {
-        kotlinOptions.jvmTarget = "1.8"
-    }
-    compileTestKotlin {
-        kotlinOptions.jvmTarget = "1.8"
-    }
-}
-
 
 idea {
     module {

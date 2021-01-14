@@ -1,12 +1,13 @@
 package locutus.protocols.ring
 
-interface Contract<S : Any, C : Contract<S, C>> {
-    fun initialSummary() : S
+import java.time.Instant
 
-    fun fold(summary : S, contract : C) : S
+interface Contract<P : Post> {
+    fun valid(p : P) : Boolean
 }
 
-interface Key<S : Any, C : Contract<S, C>> {
-    class ContractSummary<S : Any, C : Contract<S, C>>(val contract : Contract<S, C>, val summary : S)
-    fun verify(summaries : List<ContractSummary<S, C>>) : Boolean
+interface Post {
+    val id : UInt
+
+    val published : Instant
 }
