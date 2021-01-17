@@ -62,7 +62,7 @@ class MessageRouter {
                 messageHandled.set(true)
                 receiver.invoke(object : MessageReceiver<Message> {
                     override val sender = sender
-                    override val received: Message = message
+                    override val receivedMessage: Message = message
                 })
             }
         }
@@ -83,7 +83,7 @@ class MessageRouter {
 interface MessageReceiver<ReceivedMessageType : Message> {
     val sender: Peer
 
-    val received: ReceivedMessageType
+    val receivedMessage: ReceivedMessageType
 }
 
 typealias ExtractorLabel = String

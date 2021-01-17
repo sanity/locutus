@@ -87,7 +87,7 @@ class RingProtocol(
         ) {
             ring.let { ring ->
                 requireNotNull(ring)
-                cm.removeConnection(sender, "Ring.CloseConnection received due to ${received.reason}")
+                cm.removeConnection(sender, "Ring.CloseConnection received due to ${receivedMessage.reason}")
             }
         }
     }
@@ -100,15 +100,15 @@ class RingProtocol(
                 timeout = NEVER
             ) {
                 val joinRequestSender = sender
-                val joinRequestId = received.id
+                val joinRequestId = receivedMessage.id
 
-                logger.debug { "JoinRequest received from $sender with HTL ${this.received.hopsToLive} of type ${received.type::class.simpleName}" }
+                logger.debug { "JoinRequest received from $sender with HTL ${this.receivedMessage.hopsToLive} of type ${receivedMessage.type::class.simpleName}" }
                 val ring = ring
                 requireNotNull(ring)
 
                 val peerKeyLocation: PeerKeyLocation
-                logger.debug { "JoinRequest type is ${received.type::class.simpleName}" }
-                val replyType = when (val type = received.type) {
+                logger.debug { "JoinRequest type is ${receivedMessage.type::class.simpleName}" }
+                val replyType = when (val type = receivedMessage.type) {
                     is Initial -> {
                         peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
                         JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
@@ -147,9 +147,9 @@ class RingProtocol(
                 logger.debug { "Sending joinResponse to $sender accepting ${acceptedBy.size} connections." }
                 cm.send(joinRequestSender, joinResponse)
 
-                if (received.hopsToLive > 0 && ring.connectionsByLocation.size > 0) {
+                if (receivedMessage.hopsToLive > 0 && ring.connectionsByLocation.size > 0) {
                     // TODO: Need unified way to exclude peers from consideration
-                    val forwardTo = if (received.hopsToLive >= randomIfHTLAbove) {
+                    val forwardTo = if (receivedMessage.hopsToLive >= randomIfHTLAbove) {
                         logger.info { "Randomly selecting peer to forward JoinRequest from $sender" }
                         ring.randomPeer(exclude = listOf {
                             it.peerKey.peer == sender
@@ -166,7 +166,7 @@ class RingProtocol(
                         val forwarded =
                             JoinRequest(
                                 type = Proxy(peerKeyLocation),
-                                hopsToLive = min(received.hopsToLive, maxHopsToLive) - 1
+                                hopsToLive = min(receivedMessage.hopsToLive, maxHopsToLive) - 1
                             )
 
                         val forwardedAcceptors = ConcurrentHashMap<PeerKey, Unit>()
@@ -179,7 +179,7 @@ class RingProtocol(
                             retries = 3,
                             retryDelay = Duration.ofMillis(200)
                         ) {
-                            val newAcceptors = received.acceptedBy.filter { it !in forwardedAcceptors }.toSet()
+                            val newAcceptors = receivedMessage.acceptedBy.filter { it !in forwardedAcceptors }.toSet()
                             newAcceptors.forEach { forwardedAcceptors[it.peerKey] = Unit }
                             cm.send(
                                 joinRequestSender,
@@ -188,7 +188,7 @@ class RingProtocol(
                         }
                     }
                 } else {
-                    logger.warn { "Unable to forward message from $sender with HTL ${received.hopsToLive} because Ring is empty" }
+                    logger.warn { "Unable to forward message from $sender with HTL ${receivedMessage.hopsToLive} because Ring is empty" }
                 }
             }
         }
@@ -210,8 +210,8 @@ class RingProtocol(
                         retries = 5,
                         retryDelay = Duration.ofSeconds(1)
                     ) {
-                        logger.debug { "JoinResponse received from $sender of type ${received.type::class.simpleName}" }
-                        when (val type = received.type) {
+                        logger.debug { "JoinResponse received from $sender of type ${receivedMessage.type::class.simpleName}" }
+                        when (val type = receivedMessage.type) {
                             is JoinResponse.Type.Initial -> {
                                 if (myPeerKey == null) {
                                     myPeerKey =
@@ -222,7 +222,7 @@ class RingProtocol(
                             }
                         }
 
-                        received.acceptedBy.forEach { newPeer ->
+                        receivedMessage.acceptedBy.forEach { newPeer ->
                             if (ring.shouldAccept(
                                     myLocation ?: error("Can't accept $newPeer because myLocation is unknown"),
                                     newPeer.location
@@ -263,7 +263,7 @@ class RingProtocol(
                 Duration.ofSeconds(30)
             ) {
 
-                when (received.myState) {
+                when (receivedMessage.myState) {
                     Connecting -> {
                         myState.value = OCReceived
                     }
@@ -275,7 +275,7 @@ class RingProtocol(
                     }
                 }
 
-                if (received.myState != Connected) {
+                if (receivedMessage.myState != Connected) {
                     val openConnection =
                         OpenConnection(myState = myState.value)
                     logger.debug { "Acklowledging OC: $openConnection" }

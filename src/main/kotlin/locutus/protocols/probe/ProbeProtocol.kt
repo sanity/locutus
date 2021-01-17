@@ -27,7 +27,7 @@ class ProbeProtocol(val cm: ConnectionManager, val ringProtocol: RingProtocol) {
             timeout = NEVER
         ) {
             val requestor = sender
-            val incomingProbeRequest = received
+            val incomingProbeRequest = receivedMessage
             val myVisit = ringProtocol.myLocation.let { myLocation ->
                 requireNotNull(myLocation)
                 Visit(incomingProbeRequest.hopsToLive, 0, myLocation)
@@ -59,7 +59,7 @@ class ProbeProtocol(val cm: ConnectionManager, val ringProtocol: RingProtocol) {
                 nextPeer,
                 ProbeRequest(probeRequestMsg.target, min(maximumHopsToLive, probeRequestMsg.hopsToLive - 1))
             ) {
-                val inboundResponse = received
+                val inboundResponse = receivedMessage
                 val time = stopwatch.stop().elapsed(TimeUnit.NANOSECONDS)
                 val myVisit: Visit = ringProtocol.myLocation.let { myLocation ->
                     requireNotNull(myLocation)

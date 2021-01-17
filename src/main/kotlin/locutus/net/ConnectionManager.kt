@@ -197,11 +197,11 @@ class ConnectionManager(
             replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
         router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, {
             val xSender = sender
-            val xMessage: ReplyType = received
+            val xMessage: ReplyType = this.receivedMessage
             responseReceived.set(true)
             block(object : MessageReceiver<ReplyType> {
                 override val sender: Peer = xSender
-                override val received: ReplyType = xMessage
+                override val receivedMessage: ReplyType = xMessage
             })
         })
         send(to, message)
