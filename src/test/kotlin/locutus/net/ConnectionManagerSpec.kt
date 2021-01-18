@@ -34,8 +34,8 @@ class ConnectionManagerSpec : FunSpec({
                     Extractor<FooMessage, Peer>("fooExtractor") { sender },
                     peer1,
                     Duration.ofMillis(500)
-            ) {
-                receivedMessage.v shouldBe 12
+            ) { _, msg ->
+                msg.v shouldBe 12
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(12, true))
@@ -49,8 +49,8 @@ class ConnectionManagerSpec : FunSpec({
                     Extractor<BarMessage, Peer>("barExtractor") { sender },
                     key = peer2,
                     timeout = Duration.ofMillis(500)
-            ) {
-                receivedMessage.n shouldBe "hello"
+            ) { _, msg ->
+                msg.n shouldBe "hello"
                 barReceived.set(true)
             }
             cm2.send(peer1, BarMessage("hello"))
@@ -64,8 +64,8 @@ class ConnectionManagerSpec : FunSpec({
                     Extractor<FooMessage, Peer>("fooExtractor") { sender },
                     peer1,
                     Duration.ofMillis(500)
-            ) {
-                receivedMessage.v shouldBe 56
+            ) { _, msg ->
+                msg.v shouldBe 56
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(56, true))
@@ -86,8 +86,8 @@ class ConnectionManagerSpec : FunSpec({
         // cm2.addConnection(PeerKey(peer1, cm1.myKey.public), false)
         test("Send a FooMesage from peer1 to peer2 which is an initiate message") {
             val fooReceived = AtomicBoolean(false)
-            cm2.listen(Extractor<FooMessage, Peer>("fooExtractor") { sender }, peer1, Duration.ofMillis(500)) {
-                receivedMessage.v shouldBe 12
+            cm2.listen(Extractor<FooMessage, Peer>("fooExtractor") { sender }, peer1, Duration.ofMillis(500)) { _, msg ->
+                msg.v shouldBe 12
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(12, true))
@@ -97,8 +97,8 @@ class ConnectionManagerSpec : FunSpec({
         }
         test("Peer2 responds with a BarMessage which is not an initiate message") {
             val barReceived = AtomicBoolean(false)
-            cm1.listen(Extractor<BarMessage, Peer>("barExtractor") { sender  }, key = peer2, timeout = Duration.ofMillis(500)) {
-                receivedMessage.n shouldBe "hello"
+            cm1.listen(Extractor<BarMessage, Peer>("barExtractor") { sender  }, key = peer2, timeout = Duration.ofMillis(500)) { _, msg ->
+                msg.n shouldBe "hello"
                 barReceived.set(true)
             }
             cm2.send(peer1, BarMessage("hello"))
@@ -112,8 +112,8 @@ class ConnectionManagerSpec : FunSpec({
                     Extractor<FooMessage, Peer>("fooExtractor") { sender },
                     peer1,
                     Duration.ofMillis(500)
-            ) {
-                receivedMessage.v shouldBe 56
+            ) { _, msg ->
+                msg.v shouldBe 56
                 fooReceived.set(true)
             }
             cm1.send(peer2, FooMessage(56, true))

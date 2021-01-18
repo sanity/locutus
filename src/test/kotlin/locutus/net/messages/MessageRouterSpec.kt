@@ -23,8 +23,8 @@ class MessageRouterSpec : FunSpec({
 
         context("Create listener for FooMessage(1) that will cancel after initial message is received") {
             println("A")
-            messageRouter.listen(fooExtractor, 1, NEVER) {
-                fooReceived += SenderMessage(sender, receivedMessage)
+            messageRouter.listen(fooExtractor, 1, NEVER) { sender, msg ->
+                fooReceived += SenderMessage(sender, msg)
             }
             println("B")
 

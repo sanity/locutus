@@ -6,6 +6,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.Constants.MAX_UDP_PACKET_SIZE
+import locutus.net.MessageListener.Type.RECEIVED
+import locutus.net.MessageListener.Type.SENT
 import locutus.net.messages.*
 import locutus.tools.crypto.AESKey
 import locutus.tools.crypto.merge
@@ -22,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.reflect.KClass
 
 
@@ -34,7 +37,7 @@ class ConnectionManager(
 ) {
 
     constructor(port: Int, isOpen: Boolean, myKey: RSAKeyPair) :
-            this(myKey, UDPTransport(port, isOpen))
+            this(myKey, locutus.net.UDPTransport(port, isOpen))
 
     companion object {
         val protoBuf = ProtoBuf { encodeDefaults = false }
@@ -67,7 +70,7 @@ class ConnectionManager(
     }
 
     private fun listenForKeepalives() {
-        listen(keepAliveExtractor, Unit, NEVER) {
+        listen(keepAliveExtractor, Unit, NEVER) { sender, _ ->
             val connection = connections[sender]
             if (connection != null) {
                 connection.lastKeepaliveReceived = Instant.now()
@@ -167,6 +170,7 @@ class ConnectionManager(
             val outboundRaw = (keyPrepend + encryptedMessage).merge()
             require(outboundRaw.size <= MAX_UDP_PACKET_SIZE) { "Message size ${outboundRaw.size} exceeds MAX_UDP_PACKET_SIZE ($MAX_UDP_PACKET_SIZE)" }
             logger.debug { "Sending ${outboundRaw.size}b message to $to" }
+            listeners.values.forEach { it.message(SENT, message, outboundRaw, to) }
             transport.send(to, outboundRaw)
         }
     }
@@ -188,21 +192,16 @@ class ConnectionManager(
         retries: Int = 5,
         retryDelay: Duration = Duration.ofMillis(200),
         listenFor: Duration = Duration.ofSeconds(60),
-        noinline block: (MessageReceiver<ReplyType>).() -> Unit
+        noinline block: (from : Peer, message : ReplyType) -> Unit
     ) {
         assert(Reply::class.java.isAssignableFrom(ReplyType::class.java)) { "ReplyType must implement Reply interface" }
 
         val responseReceived = AtomicBoolean(false)
         val replyExtractor =
             replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
-        router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, {
-            val xSender = sender
-            val xMessage: ReplyType = this.receivedMessage
+        router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, { xSender, xMessage ->
             responseReceived.set(true)
-            block(object : MessageReceiver<ReplyType> {
-                override val sender: Peer = xSender
-                override val receivedMessage: ReplyType = xMessage
-            })
+            block.invoke(xSender, xMessage)
         })
         send(to, message)
         scope.launch(Dispatchers.IO) {
@@ -225,13 +224,13 @@ class ConnectionManager(
         for_: Extractor<MType, KeyType>,
         key: KeyType,
         timeout: Duration?,
-        noinline block: (MessageReceiver<MType>).() -> Unit
+        noinline block: (from : Peer, message : MType) -> Unit
     ) {
         router.listen(for_, key, timeout, block)
     }
 
     // TODO: This should be an expiring cache
-    private val receivedMessageIds = ConcurrentSkipListSet<MessageId>()
+    private val msgIds = ConcurrentSkipListSet<MessageId>()
 
     private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
         withLoggingContext("sender" to sender.toString()) {
@@ -292,6 +291,9 @@ class ConnectionManager(
             }
 
             val message = protoBuf.decodeFromByteArray(Message.serializer(), decryptedPayload)
+
+            listeners.values.forEach { it.message(RECEIVED, message, rawPacket, sender) }
+
             handleMessage(connection, message)
 
         }
@@ -299,7 +301,7 @@ class ConnectionManager(
 
     private fun handleMessage(connection: Connection, message: Message) {
         withLoggingContext("sender" to connection.peer.toString(), "message" to message::class.simpleName.toString()) {
-            if (message.id in receivedMessageIds) {
+            if (message.id in msgIds) {
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }
             } else {
                 logger.debug { "Handling message: ${message::class.simpleName}" }
@@ -317,7 +319,23 @@ class ConnectionManager(
         }
     }
 
+    private val listeners = ConcurrentHashMap<Long, MessageListener>()
+    private val listenerUidSupplier = AtomicLong(0)
+    fun addListener(messageListener : MessageListener) : Long {
+        val uid = listenerUidSupplier.getAndIncrement()
+        listeners[uid] = messageListener
+        return uid
+    }
 
+    fun removeListener(uid : Long) = listeners.remove(uid)
+}
+
+fun interface MessageListener {
+    enum class Type {
+        SENT, RECEIVED
+    }
+
+    fun message(type : Type, message : Message, raw : ByteArray, other : Peer)
 }
 
 private class SplitPacket(val encryptedAESKey: ByteArray, val payload: ByteArray)
