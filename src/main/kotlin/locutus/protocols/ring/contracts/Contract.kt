@@ -1,15 +1,24 @@
 package locutus.protocols.ring.contracts
 
-import java.time.Instant
+import kotlinx.serialization.Serializable
+import locutus.tools.crypto.rsa.verify
+import java.security.interfaces.RSAPublicKey
 import kotlin.reflect.KClass
 
-abstract class Contract {
+@Serializable
+sealed class Contract {
+    abstract val postType : KClass<out Post>
 
     abstract fun valid(p : Post) : Boolean
 }
 
-interface Post {
-    val id : Int
+@Serializable
+data class SignedPostContract(val pubKey : RSAPublicKey) : Contract() {
+    override val postType = SignedPost::class
 
-    val published : Instant
+    override fun valid(p: Post): Boolean {
+        if (p !is SignedPost) return false
+        return pubKey.verify(p.signature, p.payload)
+    }
 }
+
