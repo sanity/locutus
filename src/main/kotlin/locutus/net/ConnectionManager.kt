@@ -320,14 +320,14 @@ class ConnectionManager(
     }
 
     private val listeners = ConcurrentHashMap<Long, MessageListener>()
-    private val listenerUidSupplier = AtomicLong(0)
+    private val listenerHandlerGen = AtomicLong(0)
     fun addListener(messageListener : MessageListener) : Long {
-        val uid = listenerUidSupplier.getAndIncrement()
-        listeners[uid] = messageListener
-        return uid
+        val handle = listenerHandlerGen.getAndIncrement()
+        listeners[handle] = messageListener
+        return handle
     }
 
-    fun removeListener(uid : Long) = listeners.remove(uid)
+    fun removeListener(handle : Long) = listeners.remove(handle)
 }
 
 fun interface MessageListener {

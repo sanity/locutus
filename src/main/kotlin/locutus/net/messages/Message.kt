@@ -6,6 +6,7 @@ import com.sun.tools.jconsole.JConsoleContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kweb.util.random
+import locutus.protocols.bw.BytesPerSecond
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
 import java.security.interfaces.RSAPublicKey
@@ -19,7 +20,14 @@ sealed class Message {
     val id = MessageId()
 
     @Serializable
-    class Keepalive() : Message()
+    class Keepalive : Message()
+
+    object BW {
+        @Serializable
+        data class BWLimit(val maxDL : BytesPerSecond) : Message(), CanInitiate {
+            override val isInitiate = true
+        }
+    }
 
     object Ring {
         @Serializable

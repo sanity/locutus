@@ -1,6 +1,8 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
-    kotlin("jvm") version "1.4.21"
-    kotlin("plugin.serialization") version "1.4.21"
+    kotlin("jvm") version "1.4.30"
+    kotlin("plugin.serialization") version "1.4.30"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.33.0"
@@ -43,7 +45,14 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
     testImplementation("io.kotest:kotest-property-jvm:4.3.0")
 
+    testImplementation("org.koin:koin-test:2.1.6")
+}
 
+tasks.withType<KotlinCompile>().configureEach {
+    kotlinOptions {
+        languageVersion = "1.5"
+        apiVersion = "1.5"
+    }
 }
 
 idea {
