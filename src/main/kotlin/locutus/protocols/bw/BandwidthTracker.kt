@@ -28,7 +28,7 @@ class BandwidthTracker(val cm : ConnectionManager) : Closeable {
         }
     }
 
-    fun rates(peer : Peer) = peers[peer]
+    operator fun get(peer : Peer) = peers[peer]
 
     override fun close() {
         cm.removeListener(messageListenerHandle)
