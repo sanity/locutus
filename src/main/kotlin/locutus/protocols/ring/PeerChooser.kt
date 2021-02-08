@@ -1,11 +1,12 @@
 package locutus.protocols.ring
 
 import locutus.net.messages.*
+import locutus.protocols.bw.BandwidthTracker
 import java.time.Duration
 import kotlin.system.measureTimeMillis
 import kotlin.time.*
 
-class PeerChooser(val peerSource : () -> Set<PeerKeyLocation>) {
+class PeerChooser(val peerSource : () -> Set<PeerKeyLocation>, val bw : BandwidthTracker) {
     fun choose(criteria : Criteria, attempts : Int = 1, block : (Peer) -> ChooseResult) {
         require(attempts > 0)
         val delayMS : Duration = measureTimeMillis {

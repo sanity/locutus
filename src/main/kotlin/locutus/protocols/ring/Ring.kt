@@ -3,6 +3,7 @@ package locutus.protocols.ring
 import kweb.state.KVar
 import locutus.net.messages.Peer
 import locutus.net.messages.PeerKeyLocation
+import locutus.protocols.bw.BandwidthTracker
 import locutus.tools.math.Location
 import locutus.tools.math.distance
 import mu.KotlinLogging
