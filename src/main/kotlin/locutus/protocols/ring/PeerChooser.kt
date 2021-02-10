@@ -1,27 +1,27 @@
 package locutus.protocols.ring
 
 import locutus.net.messages.*
+import locutus.protocols.bw.BandwidthManagementProtocol
 import locutus.protocols.bw.BandwidthTracker
-import java.time.Duration
-import kotlin.system.measureTimeMillis
-import kotlin.time.*
 
-class PeerChooser(val peerSource : () -> Set<PeerKeyLocation>, val bw : BandwidthTracker) {
-    fun choose(criteria : Criteria, attempts : Int = 1, block : (Peer) -> ChooseResult) {
+class PeerChooser(
+    val ringProtocol: RingProtocol,
+    val bandwidthTracker: BandwidthTracker,
+    val bandwidthManagementProtocol: BandwidthManagementProtocol
+) {
+    fun choose(attempts : Int = 1, scorer : (PeerKeyLocation) -> Double) : PeerKeyLocation? {
         require(attempts > 0)
-        val delayMS : Duration = measureTimeMillis {
-            val peer : Peer = TODO()
-            block(peer)
-        }.let { Duration.ofMillis(it) }
+        return ringProtocol
+            .connectionsByLocation.values.asSequence()
+            .filter { sufficientBW(it.peerKey.peer) }
+            .map { it to scorer(it) }
+            .minByOrNull { it.second }
+            ?.first
     }
 
-    sealed class ChooseResult {
-        object Success : ChooseResult()
-        object Fail : ChooseResult()
-    }
-
-    sealed class Criteria {
-        abstract fun score(a : PeerKeyLocation, b : PeerKeyLocation) : Double
-
+    private fun sufficientBW(peer : Peer): Boolean {
+        val rates = bandwidthTracker[peer]
+        val maxBw = bandwidthManagementProtocol.getBWLimit(peer)
+        return rates == null || maxBw == null || rates.max <= maxBw.bwLimit
     }
 }

@@ -13,7 +13,7 @@ private val sensitivity = 0.1
 
 class BandwidthTracker(val cm : ConnectionManager) : Closeable {
 
-    private val global = Rates()
+    val global = Rates()
 
     private val peers = ConcurrentHashMap<Peer, Rates>()
 
@@ -38,10 +38,7 @@ class BandwidthTracker(val cm : ConnectionManager) : Closeable {
 }
 
 class Rates(val upload : Rate = Rate(), val download : Rate = Rate()) {
-    /**
-     * Ratio of downloads to uploads, eg 2.0 indicates twice as much downloaded as uploaded
-     */
-    fun ratio() : Double = download.rate.value / upload.rate.value
+    val max: BytesPerSecond get() = maxOf(upload.rate.value, download.rate.value)
 }
 
 typealias BytesPerSecond = Double

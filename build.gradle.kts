@@ -24,10 +24,10 @@ tasks.withType<Test> {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.2")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.66")
     implementation("com.google.guava:guava:30.0-jre")
@@ -41,18 +41,14 @@ dependencies {
 
     implementation("org.koin:koin-core:2.1.6")
 
+    implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
+
+
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
     testImplementation("io.kotest:kotest-property-jvm:4.3.0")
 
     testImplementation("org.koin:koin-test:2.1.6")
-}
-
-tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        languageVersion = "1.5"
-        apiVersion = "1.5"
-    }
 }
 
 idea {

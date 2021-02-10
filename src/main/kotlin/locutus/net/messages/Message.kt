@@ -2,7 +2,6 @@
 
 package locutus.net.messages
 
-import com.sun.tools.jconsole.JConsoleContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kweb.util.random
@@ -24,7 +23,7 @@ sealed class Message {
 
     object BW {
         @Serializable
-        data class BWLimit(val maxDL : BytesPerSecond) : Message(), CanInitiate {
+        data class BWLimit(val bwLimit : BytesPerSecond) : Message(), CanInitiate {
             override val isInitiate = true
         }
     }

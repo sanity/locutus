@@ -114,7 +114,7 @@ private suspend fun buildNetwork(
     val gateway1 = ConnectionManager(RSAKeyPair.create(), gateway1Transport)
     val gateway1PeerKey = PeerKey(gateway1Transport.peer, gateway1.myKey.public)
     val gatewayRingProtocol = RingProtocol(
-        cm = gateway1,
+        connectionManager = gateway1,
         gateways = setOf(),
         myPeerKey = gateway1PeerKey,
         myLocation = Location(random.nextDouble()),

@@ -28,7 +28,7 @@ import kotlin.math.min
 private val logger = KotlinLogging.logger {}
 
 class RingProtocol(
-    private val cm: ConnectionManager,
+    private val connectionManager: ConnectionManager,
     private val gateways: Set<PeerKey>,
     private val maxHopsToLive: Int = 10,
     private val randomIfHTLAbove: Int = maxHopsToLive - 3,
@@ -71,7 +71,7 @@ class RingProtocol(
         get() = ring.connectionsByLocation
 
     private fun handleConnectionManagerRemoveConnection() {
-        cm.onRemoveConnection { peer, reason ->
+        connectionManager.onRemoveConnection { peer, reason ->
             ring.let { ring ->
                 requireNotNull(ring)
                 ring -= peer
@@ -80,21 +80,21 @@ class RingProtocol(
     }
 
     private fun listenForCloseConnection() {
-        cm.listen(
+        connectionManager.listen(
             for_ = Extractor<CloseConnection, Unit>("closeConnection") { Unit },
             key = Unit,
             timeout = NEVER
         ) { sender, msg ->
             ring.let { ring ->
                 requireNotNull(ring)
-                cm.removeConnection(sender, "Ring.CloseConnection received due to ${msg.reason}")
+                connectionManager.removeConnection(sender, "Ring.CloseConnection received due to ${msg.reason}")
             }
         }
     }
 
     private fun listenForJoinRequest() {
         withLoggingContext("me" to this.myPeerKey?.peer.toString()) {
-            cm.listen(
+            connectionManager.listen(
                 for_ = Extractor<JoinRequest, Unit>("joinRequest") { Unit },
                 key = Unit,
                 timeout = NEVER
@@ -142,7 +142,7 @@ class RingProtocol(
                     replyTo = joinRequest.id
                 )
                 logger.debug { "Sending joinResponse to $sender accepting ${acceptedBy.size} connections." }
-                cm.send(sender, joinResponse)
+                connectionManager.send(sender, joinResponse)
 
                 if (joinRequest.hopsToLive > 0 && ring.connectionsByLocation.size > 0) {
                     // TODO: Need unified way to exclude peers sender consideration
@@ -170,7 +170,7 @@ class RingProtocol(
                         acceptedBy.forEach { forwardedAcceptors[it.peerKey] = Unit }
 
                         logger.info { "Forwarding JoinRequest sender $sender to $forwardTo" }
-                        cm.send<JoinResponse>(
+                        connectionManager.send<JoinResponse>(
                             to = forwardTo,
                             message = forwarded,
                             retries = 3,
@@ -178,7 +178,7 @@ class RingProtocol(
                         ) { jrSender, joinResponse ->
                             val newAcceptors = joinResponse.acceptedBy.filter { it !in forwardedAcceptors }.toSet()
                             newAcceptors.forEach { forwardedAcceptors[it.peerKey] = Unit }
-                            cm.send(
+                            connectionManager.send(
                                 jrSender,
                                 JoinResponse(JoinResponse.Type.Proxy, acceptedBy = newAcceptors, joinRequest.id)
                             )
@@ -193,15 +193,15 @@ class RingProtocol(
 
     private fun joinRing() {
         withLoggingContext("me" to this.myPeerKey?.peer.toString()) {
-            if (cm.transport.isOpen && gateways.isEmpty()) {
+            if (connectionManager.transport.isOpen && gateways.isEmpty()) {
                 logger.info { "No gateways to join through, but this is open so select own location" }
             } else {
                 for (gateway in gateways.toList().shuffled()) {
                     logger.info { "Joining Ring via $gateway" }
-                    cm.addConnection(gateway, true)
-                    val joinRequest = JoinRequest(Initial(cm.myKey.public), maxHopsToLive)
+                    connectionManager.addConnection(gateway, true)
+                    val joinRequest = JoinRequest(Initial(connectionManager.myKey.public), maxHopsToLive)
                     logger.debug { "Sending JoinRequest(id=${joinRequest.id}) to ${gateway.peer}" }
-                    cm.send<JoinResponse>(
+                    connectionManager.send<JoinResponse>(
                         to = gateway.peer,
                         message = joinRequest,
                         retries = 5,
@@ -212,7 +212,7 @@ class RingProtocol(
                             is JoinResponse.Type.Initial -> {
                                 if (myPeerKey == null) {
                                     myPeerKey =
-                                        PeerKey(type.yourExternalAddress, cm.myKey.public)
+                                        PeerKey(type.yourExternalAddress, connectionManager.myKey.public)
                                     logger.info { "Gateway has informed me that my PeerKey is $myPeerKey" }
                                 }
                                 myLocation = type.yourLocation
@@ -244,7 +244,7 @@ class RingProtocol(
             "me" to this.myPeerKey?.peer.toString(),
             "newPeer" to newPeer.peerKey.peer.toString()
         ) {
-            cm.addConnection(newPeer.peerKey, false)
+            connectionManager.addConnection(newPeer.peerKey, false)
             val myState: KVar<ConnectionState> = KVar(Connecting)
 
             myState.addListener { oldState, newState ->
@@ -254,7 +254,7 @@ class RingProtocol(
                 }
             }
 
-            cm.listen(
+            connectionManager.listen(
                 Extractor<OpenConnection, Peer>("openConnection") { sender },
                 newPeer.peerKey.peer,
                 Duration.ofSeconds(30)
@@ -276,7 +276,7 @@ class RingProtocol(
                     val openConnection =
                         OpenConnection(myState = myState.value)
                     logger.debug { "Acklowledging OC: $openConnection" }
-                    cm.send(newPeer.peerKey.peer, openConnection)
+                    connectionManager.send(newPeer.peerKey.peer, openConnection)
                 }
             }
 
@@ -286,7 +286,7 @@ class RingProtocol(
                     val openConnection =
                         OpenConnection(myState = myState.value)
                     logger.debug { "Sending $openConnection to $newPeer" }
-                    cm.send(newPeer.peerKey.peer, openConnection)
+                    connectionManager.send(newPeer.peerKey.peer, openConnection)
                     delay(Duration.ofMillis(200))
                 }
             }
