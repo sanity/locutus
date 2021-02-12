@@ -13,11 +13,14 @@ import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
 import java.time.Duration
 
-class BandwidthManagementProtocol(val cm : ConnectionManager, val ringProtocol: RingProtocol, val updateEvery : Duration = Duration.ofMinutes(1)) {
+class BandwidthManagementProtocol(
+    val cm: ConnectionManager,
+    val bandwidthTracker: BandwidthTracker,
+    val ringProtocol: RingProtocol,
+    val updateEvery: Duration = Duration.ofMinutes(1)
+) {
 
     private val scope = MainScope()
-
-    private val bandwidthTracker = BandwidthTracker(cm)
 
     private val lastBWLimitMsgs = CacheBuilder
         .newBuilder()

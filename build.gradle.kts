@@ -1,12 +1,6 @@
-object Versions {
-    const val kotlin = "1.4.30"
-    const val kotlinSerialization = "1.0.1"
-    const val kotlinCoroutines = "1.4.2"
-}
-
 plugins {
-    kotlin("jvm") version Versions.kotlin
-    kotlin("plugin.serialization") version Versions.kotlin
+    kotlin("jvm") version "1.4.30"
+    kotlin("plugin.serialization") version "1.4.30"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.33.0"
@@ -28,10 +22,10 @@ tasks.withType<Test> {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${Versions.kotlinSerialization}")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:${Versions.kotlinSerialization}")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.kotlinCoroutines}")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:${Versions.kotlinCoroutines}")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.2")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.66")
     implementation("com.google.guava:guava:30.0-jre")
@@ -47,6 +41,7 @@ dependencies {
 
     implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
 
+    implementation("com.natpryce:konfig:1.6.10.0")
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
