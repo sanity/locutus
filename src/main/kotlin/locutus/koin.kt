@@ -5,32 +5,32 @@ import locutus.net.UDPTransport
 import locutus.protocols.bw.BandwidthManagementProtocol
 import locutus.protocols.ring.PeerChooser
 import locutus.protocols.ring.RingProtocol
-import locutus.store.GatewayDAO
+import locutus.store.Gateway
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-import com.natpryce.konfig.*
-import com.typesafe.config.ConfigFactory.systemProperties
-import org.koin.core.scope.Scope
+import kotlinx.serialization.builtins.serializer
+import kweb.util.random
+import locutus.store.CfgParam
 import java.time.Duration
+
 
 val locutusModule = module {
     single { ConnectionManager(myKey = get(qualifier = named("myKey")), transport = get()) }
 
     single {
-        val listenPort = cfg[Key("net.listen_port", intType)]
-        val isOpen = cfg[Key("net.is_open", booleanType)]
 
         UDPTransport(
-        port = listenPort,
-        isOpen = isOpen
+        port = CfgParam.computeIfAbsent("udp_listen_port", Int.serializer()) {
+            random.nextInt(65535-49152) + 49152 },
+        isOpen = CfgParam.computeIfAbsent("is_open", Boolean.serializer()) { false }
     ) }
 
     single { PeerChooser(ringProtocol = get(), bandwidthTracker = get(), bandwidthManagementProtocol = get()) }
 
-    single { RingProtocol(connectionManager = get(), gateways = GatewayDAO.gatewayPeers()) }
+    single { RingProtocol(connectionManager = get(), gateways = Gateway.gatewayPeers()) }
 
     single {
-        val updateEvery = cfg[Key("bandwidth_protocol.update_every_seconds", intType)].toLong()
+        val updateEvery = CfgParam.computeIfAbsent("bw_update_interval", Long.serializer()) { 60 }
 
         BandwidthManagementProtocol(
         cm = get(),
@@ -39,8 +39,5 @@ val locutusModule = module {
         updateEvery = Duration.ofSeconds(updateEvery)
     ) }
 
-    single<Configuration> { ConfigurationProperties.fromResource("defaults.properties")  }
 
 }
-
-private val Scope.cfg get() = get<Configuration>()
