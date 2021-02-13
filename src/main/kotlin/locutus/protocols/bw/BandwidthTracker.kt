@@ -1,15 +1,10 @@
 package locutus.protocols.bw
 
-import kweb.state.KVar
 import locutus.net.ConnectionManager
 import locutus.net.MessageListener
 import locutus.net.messages.Peer
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.io.Closeable
-import java.time.Duration
-import java.time.Instant
-
-private val sensitivity = 0.1
 
 class BandwidthTracker(val cm : ConnectionManager) : Closeable {
 
@@ -38,15 +33,8 @@ class BandwidthTracker(val cm : ConnectionManager) : Closeable {
 }
 
 class Rates(val upload : Rate = Rate(), val download : Rate = Rate()) {
-    val max: BytesPerSecond get() = maxOf(upload.rate.value, download.rate.value)
+    val max: BytesPerSecond get() = maxOf(upload.rate(), download.rate())
 }
 
 typealias BytesPerSecond = Double
 
-class Rate(val lastMessageTime : KVar<Instant> = KVar(Instant.now()), val rate : KVar<BytesPerSecond> = KVar(0.0)) {
-    fun registerTraffic(bytes : Int) {
-        val duration = Duration.between(lastMessageTime.value, Instant.now())
-        val r = bytes.toDouble() / duration.seconds.toDouble()
-        this.rate.value = (this.rate.value * (1.0 - sensitivity)) + (r * sensitivity)
-    }
-}

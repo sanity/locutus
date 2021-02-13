@@ -22,6 +22,7 @@ class PeerChooser(
     private fun sufficientBW(peer : Peer): Boolean {
         val rates = bandwidthTracker[peer]
         val maxBw = bandwidthManagementProtocol.getBWLimit(peer)
-        return rates == null || maxBw == null || rates.max <= maxBw.bwLimit
+        TODO()
+       // return rates == null || maxBw == null || rates.max <= maxBw.minimumMessageInterval
     }
 }

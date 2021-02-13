@@ -25,11 +25,11 @@ class BandwidthManagementProtocol(
     private val lastBWLimitMsgs = CacheBuilder
         .newBuilder()
         .expireAfterWrite(Duration.ofMinutes(5))
-        .build<Peer, Message.BW.BWLimit>()
+        .build<Peer, Message.BW.RateLimit>()
 
     init {
         cm.listen(
-            for_ = Extractor<Message.BW.BWLimit, Unit>("bwLimit") {},
+            for_ = Extractor<Message.BW.RateLimit, Unit>("bwLimit") {},
             key = Unit,
             timeout = NEVER
             ) { requestor, bwLimit ->

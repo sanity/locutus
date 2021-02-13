@@ -1,14 +1,15 @@
-@file:UseSerializers(RSAPublicKeySerializer::class)
+@file:UseSerializers(RSAPublicKeySerializer::class, DurationSerializer::class)
 
 package locutus.net.messages
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kweb.util.random
-import locutus.protocols.bw.BytesPerSecond
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
+import locutus.tools.serializers.DurationSerializer
 import java.security.interfaces.RSAPublicKey
+import java.time.Duration
 
 @Serializable
 sealed class Message {
@@ -23,7 +24,7 @@ sealed class Message {
 
     object BW {
         @Serializable
-        data class BWLimit(val bwLimit : BytesPerSecond) : Message(), CanInitiate {
+        data class RateLimit(val minimumMessageInterval : Duration) : Message(), CanInitiate {
             override val isInitiate = true
         }
     }
