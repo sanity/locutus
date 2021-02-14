@@ -6,6 +6,10 @@ import locutus.net.messages.Peer
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.io.Closeable
 
+
+// TODO: Will also need to track inbound initiate messages to verify that rate limits
+//       are being followed.
+
 class BandwidthTracker(val cm : ConnectionManager) : Closeable {
 
     val global = Rates()

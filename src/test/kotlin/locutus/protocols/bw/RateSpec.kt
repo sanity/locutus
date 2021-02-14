@@ -13,6 +13,11 @@ class RateSpec : FunSpec({
         val secondTime = startTime.plusSeconds(30)
         rate.registerTraffic(20, secondTime)
 
-        rate.rate(secondTime) shouldBe 1.0.plusOrMinus(0.0001)
+        rate.rate(secondTime) shouldBe (0.5 plusOrMinus 0.0001)
+
+        val thirdTime = secondTime.plusSeconds(40)
+        rate.registerTraffic(30, thirdTime)
+
+        rate.rate(thirdTime)
     }
 })

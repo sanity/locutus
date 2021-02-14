@@ -22,7 +22,7 @@ class BandwidthManagementProtocol(
 
     private val scope = MainScope()
 
-    private val lastBWLimitMsgs = CacheBuilder
+    private val lastRateLimitMessages = CacheBuilder
         .newBuilder()
         .expireAfterWrite(Duration.ofMinutes(5))
         .build<Peer, Message.BW.RateLimit>()
@@ -33,7 +33,7 @@ class BandwidthManagementProtocol(
             key = Unit,
             timeout = NEVER
             ) { requestor, bwLimit ->
-                lastBWLimitMsgs.put(requestor, bwLimit)
+                lastRateLimitMessages.put(requestor, bwLimit)
         }
 
         scope.launch(Dispatchers.IO) {
@@ -49,6 +49,8 @@ class BandwidthManagementProtocol(
         }
     }
 
-    fun getBWLimit(peer : Peer) = lastBWLimitMsgs.getIfPresent(peer)
+    fun getBWLimit(peer : Peer) = lastRateLimitMessages.getIfPresent(peer)
 
 }
+
+private data class BandwidthLimitSample(val bwLimit : Duration, )

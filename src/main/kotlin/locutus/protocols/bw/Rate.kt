@@ -22,7 +22,7 @@ class Rate(val windowSize : Duration = Duration.ofMinutes(1)) {
     fun rate(currentTime: Instant = Instant.now()) : BytesPerSecond {
         synchronized(this) {
             trimWindow()
-            return totalBytes.toDouble() / (Duration.between(window.peek().time, currentTime).seconds)
+            return totalBytes.toDouble() / windowSize.seconds
         }
     }
 
