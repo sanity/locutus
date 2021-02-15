@@ -4,7 +4,7 @@ import java.security.MessageDigest
 import kotlin.experimental.and
 
 fun ByteArray.hash(): ByteArray {
-    val digest = MessageDigest.getInstance("SHA-256")
+    val digest = MessageDigest.getInstance("SHA3-256")
     digest.reset()
     digest.digest(this)
     return digest.digest()
