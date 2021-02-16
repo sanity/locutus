@@ -20,6 +20,10 @@ sealed class Post {
 
 }
 
+////////////////////////////////////////////////////////
+// Microblog
+////////////////////////////////////////////////////////
+
 /**
  * @param pubKey Valid posts must be signed by this public key
  * @param number The number of this post, starting with 0 and incrementing each time.
@@ -28,12 +32,16 @@ sealed class Post {
  */
 @Serializable
 data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null) : Contract() {
-    override val postType: KClass<out Post>
-        get() = TODO("Not yet implemented")
 
-    override fun valid(p: Post): Boolean {
-        return if (p is MicroblogPost) {
-            (number == null || number == p.payload.number) && pubKey.verify(p.signature, p.serializedPayload)
+    init {
+        require(number == null || number >= 0)
+    }
+
+    override val postType = MicroblogPost::class
+
+    override fun valid(post: Post): Boolean {
+        return if (post is MicroblogPost) {
+            (number == null || number == post.payload.number) && pubKey.verify(post.signature, post.serializedPayload)
         } else {
             false
         }
@@ -41,7 +49,7 @@ data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null
 
     override fun supersedes(old: Post, new: Post): Boolean {
         return if (old is MicroblogPost && new is MicroblogPost) {
-            return new.payload.version > old.payload.version
+            new.payload.version > old.payload.version
         } else {
             error("old (${old::class.qualifiedName}) and new (${new::class.qualifiedName}) aren't MicroblogPosts")
         }
@@ -49,13 +57,17 @@ data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null
 
 }
 
-/**
- *
- */
 @Serializable
 class MicroblogPost(val signature : RSASignature, val serializedPayload : ByteArray) : Post() {
     val payload : MicroblogPayload by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayload.serializer(), serializedPayload) }
 }
 
 @Serializable
-class MicroblogPayload(val number : Int, val version : Int, val serializedMessage : ByteArray)
+class MicroblogPayload(val number : Int, val version : Int, val serializedMessage : ByteArray) {
+    val message : MicroblogMessage by lazy { ProtoBuf.decodeFromByteArray(MicroblogMessage.serializer(), serializedMessage) }
+}
+
+@Serializable
+sealed class MicroblogMessage {
+    @Serializable data class Text(val text : String) : MicroblogMessage()
+}
