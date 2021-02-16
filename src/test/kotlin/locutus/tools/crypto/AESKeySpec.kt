@@ -4,6 +4,9 @@ import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import locutus.tools.crypto.rsa.*
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 @Order(0)
 class AESKeySpec : FunSpec({

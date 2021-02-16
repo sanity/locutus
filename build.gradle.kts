@@ -55,7 +55,7 @@ idea {
     }
 }
 
-
+/*
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
@@ -63,3 +63,5 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         apiVersion = "1.5"
     }
 }
+
+ */

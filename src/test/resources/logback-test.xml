@@ -8,11 +8,7 @@
         </encoder>
     </appender>
 
-    <logger name="locutus.protocols.ring" level="info" >
-        <appender-ref ref="STDOUT" />
-    </logger>
-
-    <root level="warn">
+    <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
 

@@ -16,7 +16,7 @@ class RSAPublicKeySerializerSpec : FunSpec({
     test("serialization") {
         val keyPair = RSAKeyPair.create()
         val serializedPubKey = ProtoBuf.encodeToByteArray(RSAPublicKeySerializer, keyPair.public)
-        logger.info("Serialized size: ${serializedPubKey.size}")
+        logger.info("Serialized size: ${serializedPubKey.size} bytes")
         val deserializedPubKey = ProtoBuf.decodeFromByteArray(RSAPublicKeySerializer, serializedPubKey)
         deserializedPubKey shouldBe keyPair.public
     }
