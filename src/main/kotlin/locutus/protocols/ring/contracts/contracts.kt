@@ -49,6 +49,9 @@ data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null
 
 }
 
+/**
+ *
+ */
 @Serializable
 class MicroblogPost(val signature : RSASignature, val serializedPayload : ByteArray) : Post() {
     val payload : MicroblogPayload by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayload.serializer(), serializedPayload) }
