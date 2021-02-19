@@ -5,32 +5,50 @@ import locutus.net.UDPTransport
 import locutus.protocols.bw.BandwidthManagementProtocol
 import locutus.protocols.ring.PeerChooser
 import locutus.protocols.ring.RingProtocol
-import locutus.store.Gateway
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import kotlinx.serialization.builtins.serializer
 import kweb.util.random
-import locutus.store.CfgParam
+import locutus.state.*
+import org.mapdb.DB
 import java.time.Duration
 
 
 val locutusModule = module {
-    single { ConnectionManager(myKey = get(qualifier = named("myKey")), transport = get()) }
 
-    single {
+    single<DB> {
+        MapDB().db
+    }
+
+    single<ShoeboxFactory> { MapDBShoeboxFactory(get()) }
+
+    single<CfgParams> { CfgParams(get()) }
+
+    single<Gateways> { Gateways(get()) }
+
+    single<ConnectionManager> { ConnectionManager(myKey = get(qualifier = named("myKey")), transport = get()) }
+
+    single<UDPTransport> {
+
+        val cfgParams : CfgParams = get()
 
         UDPTransport(
-        port = CfgParam.computeIfAbsent("udp_listen_port", Int.serializer()) {
+        port = cfgParams.computeIfAbsent("udp_listen_port", Int.serializer()) {
             random.nextInt(65535-49152) + 49152 },
-        isOpen = CfgParam.computeIfAbsent("is_open", Boolean.serializer()) { false }
+        isOpen = cfgParams.computeIfAbsent("is_open", Boolean.serializer()) { false }
     ) }
 
-    single { PeerChooser(ringProtocol = get(), bandwidthTracker = get(), bandwidthManagementProtocol = get()) }
+    single<PeerChooser> { PeerChooser(ringProtocol = get(), bandwidthTracker = get(), bandwidthManagementProtocol = get()) }
 
-    single { RingProtocol(connectionManager = get(), gateways = Gateway.gatewayPeers()) }
+    single<RingProtocol> {
+        val gateways : Gateways = get()
+        RingProtocol(connectionManager = get(), gateways = gateways.gatewayPeers())
+    }
 
-    single {
-        val updateEvery = CfgParam.computeIfAbsent("bw_update_interval", Long.serializer()) { 60 }
+    single<BandwidthManagementProtocol> {
+        val cfgParams : CfgParams = get()
+
+        val updateEvery = cfgParams.computeIfAbsent("bw_update_interval", Long.serializer()) { 60 }
 
         BandwidthManagementProtocol(
         cm = get(),

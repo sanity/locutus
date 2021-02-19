@@ -16,6 +16,7 @@ sealed class Contract {
     abstract fun supersedes(old : Post, new : Post) : Boolean
 }
 
+@Serializable
 sealed class Post {
 
 }

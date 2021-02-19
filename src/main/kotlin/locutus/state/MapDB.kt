@@ -1,13 +1,13 @@
-package locutus.store
+package locutus.state
 
 import org.mapdb.DBMaker
 import org.mapdb.HTreeMap
 import org.mapdb.Serializer
 
-object MapDB {
+class MapDB(val filename : String = "locutus.db") {
 
     val db = DBMaker
-        .fileDB("locutus.db")
+        .fileDB(filename)
         .transactionEnable()
         .make()
 
@@ -18,9 +18,5 @@ object MapDB {
                 db.close()
             }
         })
-    }
-
-    fun newTable(name : String): HTreeMap<String, ByteArray> {
-        return MapDB.db.hashMap(name).keySerializer(Serializer.STRING).valueSerializer(Serializer.BYTE_ARRAY).create()
     }
 }
