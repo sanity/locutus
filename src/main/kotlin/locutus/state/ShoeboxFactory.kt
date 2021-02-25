@@ -17,6 +17,6 @@ class MapDBShoeboxFactory(val db: DB) : ShoeboxFactory {
 
 class MemoryShoeboxFactory : ShoeboxFactory {
     override fun <V : Any> create(name: String, serializer: KSerializer<V>): Shoebox<V>
-        = Shoebox(MemoryStore<V>())
+        = Shoebox(MemoryStore())
 
 }

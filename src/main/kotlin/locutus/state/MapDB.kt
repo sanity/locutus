@@ -4,7 +4,7 @@ import org.mapdb.DBMaker
 import org.mapdb.HTreeMap
 import org.mapdb.Serializer
 
-class MapDB(val filename : String = "locutus.db") {
+class MapDB(filename : String = "locutus.db") {
 
     val db = DBMaker
         .fileDB(filename)
