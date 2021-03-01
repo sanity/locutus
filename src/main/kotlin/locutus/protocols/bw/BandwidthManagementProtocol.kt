@@ -6,9 +6,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import locutus.net.ConnectionManager
-import locutus.net.messages.Extractor
 import locutus.net.messages.Message
-import locutus.net.messages.NEVER
 import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
 import java.time.Duration
@@ -25,15 +23,11 @@ class BandwidthManagementProtocol(
     private val lastRateLimitMessages = CacheBuilder
         .newBuilder()
         .expireAfterWrite(Duration.ofMinutes(5))
-        .build<Peer, Message.BW.RateLimit>()
+        .build<Peer, Message.Meta.RateLimit>()
 
     init {
-        cm.listen(
-            for_ = Extractor<Message.BW.RateLimit, Unit>("bwLimit") {},
-            key = Unit,
-            timeout = NEVER
-            ) { requestor, bwLimit ->
-                lastRateLimitMessages.put(requestor, bwLimit)
+        cm.listen<Message.Meta.RateLimit> { requestor, rateLimit ->
+                lastRateLimitMessages.put(requestor, rateLimit)
         }
 
         scope.launch(Dispatchers.IO) {

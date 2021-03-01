@@ -217,6 +217,15 @@ class ConnectionManager(
         }
     }
 
+    inline fun <reified MType : Message> listen(noinline block: (from : Peer, message : MType) -> Unit) {
+        listen(
+            for_ = Extractor(MType::class.simpleName ?: error("Message class has no simpleName")) { },
+            key = Unit,
+            NEVER,
+            block
+        )
+    }
+
     /**
      * Listen for incoming messages, see [MessageRouter.listen]
      */
@@ -299,7 +308,7 @@ class ConnectionManager(
         }
     }
 
-    private fun handleMessage(connection: Connection, message: Message) {
+    fun handleMessage(connection: Connection, message: Message) {
         withLoggingContext("sender" to connection.peer.toString(), "message" to message::class.simpleName.toString()) {
             if (message.id in msgIds) {
                 logger.warn { "Disregarding message ${message.id} because it has already been received" }

@@ -22,11 +22,25 @@ sealed class Message {
     @Serializable
     class Keepalive : Message()
 
-    object BW {
+    object Meta {
         @Serializable
         data class RateLimit(val minimumMessageInterval : Duration) : Message(), CanInitiate {
             override val isInitiate = true
         }
+
+        @Serializable
+        class LargeMessage(
+            val uid: Int,
+            val partNo: Int,
+            val ttlParts: Int,
+            val payload: ByteArray,
+            val msgTransmitDelay: Duration,
+            override val isInitiate: Boolean
+        ) : Message(), CanInitiate
+
+        @Serializable
+        class LargeMessageResend(val uid : Int, val missingParts : Set<Int>) : Message()
+
     }
 
     object Ring {

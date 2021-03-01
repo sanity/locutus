@@ -39,20 +39,21 @@ class RingProtocol(
 
 ) {
 
-    var myPeerKeyLocation : PeerKeyLocation? get() {
-        return myPeerKey.let { myPeerKey ->
-            myLocation.let {myLocation ->
-                requireNotNull(myPeerKey)
-                requireNotNull(myLocation)
-                PeerKeyLocation(myPeerKey, myLocation)
+    var myPeerKeyLocation: PeerKeyLocation?
+        get() {
+            return myPeerKey.let { myPeerKey ->
+                myLocation.let { myLocation ->
+                    requireNotNull(myPeerKey)
+                    requireNotNull(myLocation)
+                    PeerKeyLocation(myPeerKey, myLocation)
+                }
             }
         }
-    }
-    set(value) {
-        requireNotNull(value)
-        myPeerKey = value.peerKey
-        myLocation = value.location
-    }
+        set(value) {
+            requireNotNull(value)
+            myPeerKey = value.peerKey
+            myLocation = value.location
+        }
 
 
     private val scope = MainScope()
@@ -80,25 +81,14 @@ class RingProtocol(
     }
 
     private fun listenForCloseConnection() {
-        connectionManager.listen(
-            for_ = Extractor<CloseConnection, Unit>("closeConnection") { Unit },
-            key = Unit,
-            timeout = NEVER
-        ) { sender, msg ->
-            ring.let { ring ->
-                requireNotNull(ring)
-                connectionManager.removeConnection(sender, "Ring.CloseConnection received due to ${msg.reason}")
-            }
+        connectionManager.listen<CloseConnection> { sender, msg ->
+            connectionManager.removeConnection(sender, "Ring.CloseConnection received due to ${msg.reason}")
         }
     }
 
     private fun listenForJoinRequest() {
         withLoggingContext("me" to this.myPeerKey?.peer.toString()) {
-            connectionManager.listen(
-                for_ = Extractor<JoinRequest, Unit>("joinRequest") { Unit },
-                key = Unit,
-                timeout = NEVER
-            ) { sender, joinRequest ->
+            connectionManager.listen<JoinRequest> { sender, joinRequest ->
 
                 logger.debug { "JoinRequest received sender $sender with HTL ${joinRequest.hopsToLive} of type ${joinRequest.type::class.simpleName}" }
                 val ring = ring

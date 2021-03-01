@@ -3,11 +3,9 @@ package locutus.protocols.probe
 import com.google.common.base.Stopwatch
 import kotlinx.coroutines.*
 import locutus.net.ConnectionManager
-import locutus.net.messages.Extractor
 import locutus.net.messages.Message.Probe.ProbeRequest
 import locutus.net.messages.Message.Probe.ProbeResponse
 import locutus.net.messages.Message.Probe.ProbeResponse.Visit
-import locutus.net.messages.NEVER
 import locutus.protocols.ring.RingProtocol
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
@@ -21,11 +19,7 @@ class ProbeProtocol(val cm: ConnectionManager, val ringProtocol: RingProtocol) {
     }
 
     init {
-        cm.listen(
-            for_ = Extractor<ProbeRequest, Unit>("probeRequest") { },
-            key = Unit,
-            timeout = NEVER
-        ) { requestor, incomingProbeRequest ->
+        cm.listen<ProbeRequest> { requestor, incomingProbeRequest ->
             val myVisit = ringProtocol.myLocation.let { myLocation ->
                 requireNotNull(myLocation)
                 Visit(incomingProbeRequest.hopsToLive, 0, myLocation)

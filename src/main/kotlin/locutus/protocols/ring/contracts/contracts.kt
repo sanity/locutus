@@ -11,9 +11,13 @@ import kotlin.reflect.KClass
 sealed class Contract {
     abstract val postType : KClass<out Post>
 
-    abstract fun valid(p : Post) : Boolean
+    abstract fun valid(retriever : ContractRetriever, p : Post) : Boolean
 
     abstract fun supersedes(old : Post, new : Post) : Boolean
+}
+
+interface ContractRetriever {
+    fun retrieve(contract : Contract) : Post
 }
 
 @Serializable
@@ -40,7 +44,7 @@ data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null
 
     override val postType = MicroblogPost::class
 
-    override fun valid(post: Post): Boolean {
+    override fun valid(retriever : ContractRetriever, post: Post): Boolean {
         return if (post is MicroblogPost) {
             (number == null || number == post.payload.number) && pubKey.verify(post.signature, post.serializedPayload)
         } else {
@@ -72,3 +76,10 @@ class MicroblogPayload(val number : Int, val version : Int, val serializedMessag
 sealed class MicroblogMessage {
     @Serializable data class Text(val text : String) : MicroblogMessage()
 }
+
+////////////////////////////////////////////////////////
+// Microblog
+////////////////////////////////////////////////////////
+
+@Serializable
+data class GroupPost(val members : Set<RSAPublicKey>) : Post()
