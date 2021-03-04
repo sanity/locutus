@@ -31,8 +31,9 @@ sealed class Message {
         @Serializable
         class LargeMessage(
             val uid: Int,
-            val partNo: Int,
-            val ttlParts: Int,
+            val partSizeBytes : Int,
+            val partNo : Int,
+            val totalParts : Int,
             val payload: ByteArray,
             val msgTransmitDelay: Duration,
             override val isInitiate: Boolean
