@@ -11,6 +11,9 @@ import locutus.tools.serializers.DurationSerializer
 import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 
+typealias PartNo = Int
+typealias Bytes = Int
+
 @Serializable
 sealed class Message {
 
@@ -31,16 +34,16 @@ sealed class Message {
         @Serializable
         class LargeMessage(
             val uid: Int,
-            val partSizeBytes : Int,
+            val totalSize : Bytes,
             val partNo : Int,
             val totalParts : Int,
             val payload: ByteArray,
-            val msgTransmitDelay: Duration,
+            val expectNextMessageBy: Duration?,
             override val isInitiate: Boolean
         ) : Message(), CanInitiate
 
         @Serializable
-        class LargeMessageResend(val uid : Int, val missingParts : Set<Int>) : Message()
+        class LargeMessageResend(val uid : Int, val missingParts : Set<PartNo>, val lastReceivedPartNo : PartNo?) : Message()
 
     }
 
