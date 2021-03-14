@@ -22,6 +22,17 @@ fun Iterable<ByteArray>.merge(): ByteArray {
     return ret
 }
 
+fun ByteArray.split(maxPieceSize : Int) : ArrayList<ByteArray> {
+    var pos = 0
+    val ret = ArrayList<ByteArray>()
+    while (pos < size) {
+        val pieceEnd = pos + maxPieceSize
+        ret += this.copyOfRange(pos, kotlin.math.min(pieceEnd, size))
+        pos = pieceEnd
+    }
+    return ret
+}
+
 fun ByteArray.startsWith(prefix: ByteArray) : Boolean {
     for ((ix, b) in prefix.withIndex()) {
         if (this[ix] != b) return false

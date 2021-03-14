@@ -26,6 +26,8 @@ class BandwidthManagementProtocol(
         .build<Peer, Message.Meta.RateLimit>()
 
     init {
+        cm.assertUnique(this::class)
+
         cm.listen<Message.Meta.RateLimit> { requestor, rateLimit ->
                 lastRateLimitMessages.put(requestor, rateLimit)
         }

@@ -20,6 +20,7 @@ import mu.KotlinLogging
 import mu.withLoggingContext
 import java.time.Duration
 import java.time.Instant
+import java.util.HashSet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ConcurrentSkipListSet
@@ -54,6 +55,21 @@ class ConnectionManager(
     private val connections = ConcurrentHashMap<Peer, Connection>()
 
     private val removeConnectionListeners = ConcurrentLinkedQueue<(Peer, String) -> Unit>()
+
+    private val distinctLabels = HashSet<Any>()
+
+    /**
+     * In many situations accidental duplicate use of a ConnectionManager will cause unexpected
+     * behavior. This mechanism allows protocols and other classes to assert that they are
+     * uniquely associated with a ConnectionManager. Frequently they will use their KClass,
+     * but any object will do provided that equals() and hashCode() are implemented.
+     */
+    fun assertUnique(label : Any) {
+        synchronized(distinctLabels) {
+            require(label !in distinctLabels) { "Attempt made to use $label twice, violating uniqueness requirement" }
+            distinctLabels += label
+        }
+    }
 
     @PublishedApi
     internal val router = MessageRouter()

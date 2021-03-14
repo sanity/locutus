@@ -19,6 +19,8 @@ class ProbeProtocol(val cm: ConnectionManager, val ringProtocol: RingProtocol) {
     }
 
     init {
+        cm.assertUnique(this::class)
+
         cm.listen<ProbeRequest> { requestor, incomingProbeRequest ->
             val myVisit = ringProtocol.myLocation.let { myLocation ->
                 requireNotNull(myLocation)

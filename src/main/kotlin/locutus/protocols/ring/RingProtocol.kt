@@ -61,6 +61,8 @@ class RingProtocol(
     val ring: Ring = Ring()
 
     init {
+        connectionManager.assertUnique(this::class)
+
         handleConnectionManagerRemoveConnection()
         listenForJoinRequest()
         listenForCloseConnection()

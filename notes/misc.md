@@ -1,3 +1,10 @@
+### Design
+
+Expose a key-value store API, perhaps compliant with some existing protocol if suitable. Make it super-easy to build
+apps on top of it, they get a familiar interface, but decentralized and distributed underneath.
+
+
+
 ### Business model
 
 * Coinbase + Patreon + decentralized twitter

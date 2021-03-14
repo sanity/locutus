@@ -1,20 +1,33 @@
 package locutus.net
 
 import com.google.common.cache.CacheBuilder
+import kweb.util.random
 import locutus.Constants
-import locutus.net.messages.Message
 import locutus.net.messages.Message.Meta.LargeMessage
 import locutus.net.messages.Message.Meta.LargeMessageResend
 import locutus.net.messages.PartNo
 import locutus.net.messages.Peer
+import locutus.tools.crypto.split
 import java.time.Duration
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.collections.ArrayDeque
 import kotlin.collections.HashSet
 
-private val MAX_PART_SIZE = Constants.MAX_UDP_PACKET_SIZE-100
+typealias BytesPerSecond = Double
 
-class LargeMessageHandler(val connectionManager : ConnectionManager) {
+private const val MAX_PART_SIZE = Constants.MAX_UDP_PACKET_SIZE - 100
+
+/*
+ STREAMING
+
+ How do we stream LargeMessages back along a request path to minimize response latency?
+
+
+ */
+
+class LargeMessageHandler(val connectionManager: ConnectionManager) {
 
     private val timer = Timer()
 
@@ -24,19 +37,31 @@ class LargeMessageHandler(val connectionManager : ConnectionManager) {
         .build<Int, InboundMessageHandler>()
 
     init {
+        connectionManager.assertUnique(this::class)
+
         connectionManager.listen<LargeMessage> { sender, largeMessage ->
 
         }
     }
 
-    fun send(to : Peer, serializedMessage : ByteArray) {
+    class PeerMessage(val to : Peer, val serializedMessage: ByteArray)
 
+    private val messageQueue = ConcurrentLinkedDeque<PeerMessage>()
+
+    fun send(to: Peer, serializedMessage: ByteArray, sendRate: BytesPerSecond) {
+        val splitMessage = serializedMessage.split(MAX_PART_SIZE)
+        val lmUid = random.nextInt()
+        splitMessage.withIndex().forEach { (ix, payload) ->
+            // FIXME: Math in the next line needs to be checked
+            val expectNextMessageBy : Duration = Duration.ofMillis(((1000 * payload.size.toDouble() / sendRate).toLong()) )
+            val lm = LargeMessage(lmUid, serializedMessage.size, 0, splitMessage.size, payload, expectNextMessageBy, ix == 0)
+        }
     }
 
-    private fun handle(from : Peer, message : LargeMessage) {
+    private fun handle(from: Peer, message: LargeMessage) {
         val handler = inboundMessageHandlers.get(message.uid) { InboundMessageHandler(from, message.totalParts) }
 
-        val missingMessageParts : Set<PartNo> = handler
+        val missingMessageParts: Set<PartNo> = handler
             .receivedMessages
             .asSequence()
             .withIndex()
@@ -60,18 +85,18 @@ class LargeMessageHandler(val connectionManager : ConnectionManager) {
         }
     }
 
-    class InboundMessageHandler(val sender : Peer, totalParts : Int) {
+    class InboundMessageHandler(val sender: Peer, totalParts: Int) {
 
         @Volatile
-        internal var nextMessageTimeout : TimerTask? = null
+        internal var nextMessageTimeout: TimerTask? = null
 
-        internal val receivedMessages : CopyOnWriteArrayList<LargeMessage?> = CopyOnWriteArrayList(Array<LargeMessage?>(totalParts) { null })
+        internal val receivedMessages: CopyOnWriteArrayList<LargeMessage?> = CopyOnWriteArrayList(Array<LargeMessage?>(totalParts) { null })
 
-        operator fun plusAssign(message : LargeMessage) {
+        operator fun plusAssign(message: LargeMessage) {
             receivedMessages[message.partNo] = message
         }
 
-        fun isComplete() : ByteArray? {
+        fun isComplete(): ByteArray? {
             // TODO: Scanning receivedMessages every time is inefficient
             if (receivedMessages.none { it == null }) {
                 val firstMessage = receivedMessages.first() ?: return ByteArray(0)

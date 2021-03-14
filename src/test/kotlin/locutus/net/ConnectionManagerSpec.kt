@@ -1,5 +1,6 @@
 package locutus.net
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.timing.eventually
 import io.kotest.core.spec.Order
 import io.kotest.core.spec.style.FunSpec
@@ -19,6 +20,18 @@ import kotlin.time.seconds
 @ExperimentalSerializationApi
 @Order(0)
 class ConnectionManagerSpec : FunSpec({
+    context("a simple ConnectionManager") {
+        val cm = ConnectionManager(port = 13257, myKey = RSAKeyPair.create(), isOpen = false)
+        test("Verify that assertDictinctAndSet() works") {
+            val label = "label"
+            cm.assertUnique(label)
+            shouldThrow<IllegalArgumentException> {
+                cm.assertUnique(label)
+            }
+        }
+
+    }
+
     context("two non-open managers") {
         val cm1Port = 13255
         val cm2Port = 13256
