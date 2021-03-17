@@ -9,20 +9,26 @@ import kotlin.reflect.KClass
 
 @Serializable
 sealed class Contract {
-    abstract val postType : KClass<out Post>
+    abstract fun valid(retriever: ContractRetriever, p: Post): Boolean
 
-    abstract fun valid(retriever : ContractRetriever, p : Post) : Boolean
-
-    abstract fun supersedes(old : Post, new : Post) : Boolean
+    abstract fun supersedes(old: Post, new: Post): Boolean
 }
 
 interface ContractRetriever {
-    fun retrieve(contract : Contract) : Post
+    fun retrieve(contract: Contract): Post
 }
 
 @Serializable
-sealed class Post {
+sealed class Post() {
 
+}
+
+////////////////////////////////////////////////////////
+// Utilities
+////////////////////////////////////////////////////////
+
+abstract class ContractView : Contract() {
+    abstract fun keyExtractor(post : Post) : Any
 }
 
 ////////////////////////////////////////////////////////
@@ -36,15 +42,13 @@ sealed class Post {
  *               updated with each new post.
  */
 @Serializable
-data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null) : Contract() {
+data class MicroblogContract(val pubKey: RSAPublicKey, val number: Int? = null) : Contract() {
 
     init {
         require(number == null || number >= 0)
     }
 
-    override val postType = MicroblogPost::class
-
-    override fun valid(retriever : ContractRetriever, post: Post): Boolean {
+    override fun valid(retriever: ContractRetriever, post: Post): Boolean {
         return if (post is MicroblogPost) {
             (number == null || number == post.payload.number) && pubKey.verify(post.signature, post.serializedPayload)
         } else {
@@ -56,30 +60,25 @@ data class MicroblogContract(val pubKey : RSAPublicKey, val number : Int? = null
         return if (old is MicroblogPost && new is MicroblogPost) {
             new.payload.version > old.payload.version
         } else {
-            error("old (${old::class.qualifiedName}) and new (${new::class.qualifiedName}) aren't MicroblogPosts")
+            throw ClassCastException("Post $old or $new isn't a MicroblogPost")
         }
     }
 
 }
 
 @Serializable
-class MicroblogPost(val signature : RSASignature, val serializedPayload : ByteArray) : Post() {
-    val payload : MicroblogPayload by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayload.serializer(), serializedPayload) }
-}
-
-@Serializable
-class MicroblogPayload(val number : Int, val version : Int, val serializedMessage : ByteArray) {
-    val message : MicroblogMessage by lazy { ProtoBuf.decodeFromByteArray(MicroblogMessage.serializer(), serializedMessage) }
+class MicroblogPayload(val number: Int, val version: Int, val serializedMessage: ByteArray) {
+    val message: MicroblogMessage by lazy { ProtoBuf.decodeFromByteArray(MicroblogMessage.serializer(), serializedMessage) }
 }
 
 @Serializable
 sealed class MicroblogMessage {
-    @Serializable data class Text(val text : String) : MicroblogMessage()
+    @Serializable
+    data class Text(val text: String) : MicroblogMessage()
 }
 
-////////////////////////////////////////////////////////
-// Microblog
-////////////////////////////////////////////////////////
 
 @Serializable
-data class GroupPost(val members : Set<RSAPublicKey>) : Post()
+class MicroblogPost(val signature: RSASignature, val serializedPayload: ByteArray) : Post() {
+    val payload: MicroblogPayload by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayload.serializer(), serializedPayload) }
+}
