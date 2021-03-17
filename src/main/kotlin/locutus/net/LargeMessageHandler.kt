@@ -19,13 +19,8 @@ typealias BytesPerSecond = Double
 
 private const val MAX_PART_SIZE = Constants.MAX_UDP_PACKET_SIZE - 100
 
-/*
- STREAMING
-
- How do we stream LargeMessages back along a request path to minimize response latency?
-
-
- */
+// TODO: Streaming of large messages
+//  This will probably require a separate Handler
 
 class LargeMessageHandler(val connectionManager: ConnectionManager) {
 
@@ -52,7 +47,6 @@ class LargeMessageHandler(val connectionManager: ConnectionManager) {
         val splitMessage = serializedMessage.split(MAX_PART_SIZE)
         val lmUid = random.nextInt()
         splitMessage.withIndex().forEach { (ix, payload) ->
-            // FIXME: Math in the next line needs to be checked
             val expectNextMessageBy : Duration = Duration.ofMillis(((1000 * payload.size.toDouble() / sendRate).toLong()) )
             val lm = LargeMessage(lmUid, serializedMessage.size, 0, splitMessage.size, payload, expectNextMessageBy, ix == 0)
         }

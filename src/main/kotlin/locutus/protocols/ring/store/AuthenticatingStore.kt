@@ -5,7 +5,7 @@ import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.Post
 
 class AuthenticatingStore {
-    fun <P : Post> add(contract : Contract<P>, post : P) {
-
-    }
+    fun <P : Post> add(contract : Contract, post : Post) {
+        TODO()
+     }
 }
