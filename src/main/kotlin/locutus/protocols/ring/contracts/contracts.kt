@@ -5,13 +5,14 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.tools.crypto.rsa.RSASignature
 import locutus.tools.crypto.rsa.verify
 import java.security.interfaces.RSAPublicKey
-import kotlin.reflect.KClass
 
 @Serializable
 sealed class Contract {
     abstract fun valid(retriever: ContractRetriever, p: Post): Boolean
 
     abstract fun supersedes(old: Post, new: Post): Boolean
+
+    val sig by lazy { Address.fromContract(this) }
 }
 
 interface ContractRetriever {
@@ -19,16 +20,14 @@ interface ContractRetriever {
 }
 
 @Serializable
-sealed class Post() {
-
-}
+sealed class Post
 
 ////////////////////////////////////////////////////////
 // Utilities
 ////////////////////////////////////////////////////////
 
 abstract class ContractView : Contract() {
-    abstract fun keyExtractor(post : Post) : Any
+    abstract fun keyExtractor(post: Post): Any
 }
 
 ////////////////////////////////////////////////////////

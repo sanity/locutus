@@ -41,6 +41,8 @@ dependencies {
 
     implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
 
+    implementation("org.bitcoinj:bitcoinj-core:0.15.10")
+
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
     testImplementation("io.kotest:kotest-property-jvm:4.3.0")
