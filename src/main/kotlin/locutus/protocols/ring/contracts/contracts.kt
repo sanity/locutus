@@ -12,7 +12,7 @@ sealed class Contract {
 
     abstract fun supersedes(old: Post, new: Post): Boolean
 
-    val sig by lazy { Address.fromContract(this) }
+    val sig by lazy { ContractAddress.fromContract(this) }
 }
 
 interface ContractRetriever {
@@ -41,7 +41,7 @@ abstract class ContractView : Contract() {
  *               updated with each new post.
  */
 @Serializable
-data class MicroblogContract(val pubKey: RSAPublicKey, val number: Int? = null) : Contract() {
+data class MicroblogContractV1(val pubKey: RSAPublicKey, val number: Int? = null) : Contract() {
 
     init {
         require(number == null || number >= 0)
@@ -66,7 +66,7 @@ data class MicroblogContract(val pubKey: RSAPublicKey, val number: Int? = null) 
 }
 
 @Serializable
-class MicroblogPayload(val number: Int, val version: Int, val serializedMessage: ByteArray) {
+class MicroblogPayloadV1(val number: Int, val version: Int, val serializedMessage: ByteArray) {
     val message: MicroblogMessage by lazy { ProtoBuf.decodeFromByteArray(MicroblogMessage.serializer(), serializedMessage) }
 }
 
@@ -79,5 +79,5 @@ sealed class MicroblogMessage {
 
 @Serializable
 class MicroblogPost(val signature: RSASignature, val serializedPayload: ByteArray) : Post() {
-    val payload: MicroblogPayload by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayload.serializer(), serializedPayload) }
+    val payload: MicroblogPayloadV1 by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayloadV1.serializer(), serializedPayload) }
 }

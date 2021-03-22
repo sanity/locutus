@@ -7,6 +7,7 @@ import locutus.net.messages.Message.Meta.LargeMessage
 import locutus.net.messages.Message.Meta.LargeMessageResend
 import locutus.net.messages.PartNo
 import locutus.net.messages.Peer
+import locutus.tools.PartTracker
 import locutus.tools.crypto.split
 import java.time.Duration
 import java.util.*
@@ -35,7 +36,9 @@ class LargeMessageHandler(val connectionManager: ConnectionManager) {
         connectionManager.assertUnique(this::class)
 
         connectionManager.listen<LargeMessage> { sender, largeMessage ->
-
+            val handler = inboundMessageHandlers.asMap().computeIfAbsent(largeMessage.uid) {
+                InboundMessageHandler(sender, largeMessage.totalParts)
+            }.plusAssign(largeMessage)
         }
     }
 
@@ -55,14 +58,7 @@ class LargeMessageHandler(val connectionManager: ConnectionManager) {
     private fun handle(from: Peer, message: LargeMessage) {
         val handler = inboundMessageHandlers.get(message.uid) { InboundMessageHandler(from, message.totalParts) }
 
-        val missingMessageParts: Set<PartNo> = handler
-            .receivedMessages
-            .asSequence()
-            .withIndex()
-            .takeWhile { it.index < message.partNo }
-            .filter { it.value == null }
-            .map { it.index }
-            .toCollection(HashSet())
+        val missingMessageParts = handler.partTracker.missingRanges(message.partNo)
         if (missingMessageParts.isNotEmpty()) {
             connectionManager.send(handler.sender, LargeMessageResend(message.uid, missingMessageParts, message.partNo))
         }
@@ -86,8 +82,11 @@ class LargeMessageHandler(val connectionManager: ConnectionManager) {
 
         internal val receivedMessages: CopyOnWriteArrayList<LargeMessage?> = CopyOnWriteArrayList(Array<LargeMessage?>(totalParts) { null })
 
+        internal val partTracker = PartTracker()
+
         operator fun plusAssign(message: LargeMessage) {
             receivedMessages[message.partNo] = message
+            partTracker += message.partNo
         }
 
         fun isComplete(): ByteArray? {

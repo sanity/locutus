@@ -89,8 +89,8 @@ class ConnectionManagerSpec : FunSpec({
     }
 
     context("Non-open to open") {
-        val cm1Port = 13257
-        val cm2Port = 13258
+        val cm1Port = 13259
+        val cm2Port = 13260
         val cm1 = ConnectionManager(port = cm1Port, myKey = RSAKeyPair.create(), isOpen = false)
         val cm2 = ConnectionManager(port = cm2Port, myKey = RSAKeyPair.create(), isOpen = true)
         val peer2 = Peer(InetSocketAddress("localhost", cm2Port))

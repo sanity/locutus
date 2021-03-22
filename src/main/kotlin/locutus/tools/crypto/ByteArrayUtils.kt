@@ -5,9 +5,7 @@ import kotlin.experimental.and
 
 fun ByteArray.hash(): ByteArray {
     val digest = MessageDigest.getInstance("SHA3-256")
-    digest.reset()
-    digest.digest(this)
-    return digest.digest()
+    return digest.digest(this)
 }
 
 fun Iterable<ByteArray>.merge(): ByteArray {

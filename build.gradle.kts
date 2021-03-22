@@ -19,6 +19,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+configure<SourceSetContainer> {
+    named("main") {
+        java.srcDir("src/main/kotlin")
+    }
+}
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))

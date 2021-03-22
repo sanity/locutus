@@ -1,4 +1,4 @@
-package locutus.tools.crypto.ec
+package locutus.tools.serializers
 
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor

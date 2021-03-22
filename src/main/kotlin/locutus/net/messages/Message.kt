@@ -1,4 +1,4 @@
-@file:UseSerializers(RSAPublicKeySerializer::class, DurationSerializer::class)
+@file:UseSerializers(RSAPublicKeySerializer::class, DurationSerializer::class, IntRangeSerializer::class)
 
 package locutus.net.messages
 
@@ -8,6 +8,7 @@ import kweb.util.random
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
 import locutus.tools.serializers.DurationSerializer
+import locutus.tools.serializers.IntRangeSerializer
 import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 
@@ -43,7 +44,7 @@ sealed class Message {
         ) : Message(), CanInitiate
 
         @Serializable
-        class LargeMessageResend(val uid : Int, val missingParts : Set<PartNo>, val lastReceivedPartNo : PartNo?) : Message()
+        class LargeMessageResend(val uid : Int, val missingParts : List<IntRange>, val lastReceivedPartNo : PartNo?) : Message()
 
     }
 
