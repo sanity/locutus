@@ -48,6 +48,9 @@ dependencies {
 
     implementation("org.bitcoinj:bitcoinj-core:0.15.10")
 
+    implementation("com.github.Backblaze:JavaReedSolomon:0e7f3c8435")
+
+
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
     testImplementation("io.kotest:kotest-property-jvm:4.3.0")
