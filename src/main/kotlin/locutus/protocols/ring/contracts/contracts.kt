@@ -2,6 +2,7 @@ package locutus.protocols.ring.contracts
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoBuf
+import locutus.net.messages.Bytes
 import locutus.tools.crypto.rsa.RSASignature
 import locutus.tools.crypto.rsa.verify
 import java.security.interfaces.RSAPublicKey
@@ -28,6 +29,21 @@ sealed class Post
 
 abstract class ContractView : Contract() {
     abstract fun keyExtractor(post: Post): Any
+}
+
+////////////////////////////////////////////////////////
+// Large File Contract
+///////////////////////////////////////////////////////
+
+class LargeFileContract(val part : Int, val parts : Int, val parityParts : Int, val blockSize : Bytes) : Contract() {
+    override fun valid(retriever: ContractRetriever, p: Post): Boolean {
+        TODO("Not yet implemented")
+    }
+
+    override fun supersedes(old: Post, new: Post): Boolean {
+        TODO("Not yet implemented")
+    }
+
 }
 
 ////////////////////////////////////////////////////////
