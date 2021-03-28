@@ -8,7 +8,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.time.Duration
 
-class DurationSerializer : KSerializer<Duration> {
+object DurationSerializer : KSerializer<Duration> {
 
     override fun serialize(encoder: Encoder, value: Duration) {
         val surrogate = DurationSurrogate(value.seconds, value.nano)
