@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.4.30"
-    kotlin("plugin.serialization") version "1.4.30"
+    kotlin("jvm") version "1.5.0-M2"
+    kotlin("plugin.serialization") version "1.5.0-M2"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.33.0"
@@ -69,5 +69,11 @@ idea {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
         jvmTarget = "1.8"
+        languageVersion = "1.5"
+        apiVersion = "1.5"
     }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile::class) {
+ //   kotlinOptions.useIR = true
 }

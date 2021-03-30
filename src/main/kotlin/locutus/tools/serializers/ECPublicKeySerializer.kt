@@ -13,7 +13,7 @@ object ECPublicKeySerializer : KSerializer<ECPublicKey> {
     override fun deserialize(decoder: Decoder): ECPublicKey {
         val surrogate = decoder.decodeSerializableValue(ECPublickKeySurrogate.serializer())
         val spec = X509EncodedKeySpec(surrogate.encoded)
-        val keyFactory = KeyFactory.getInstance("EC ")
+        val keyFactory = KeyFactory.getInstance("EC")
         return keyFactory.generatePublic(spec) as ECPublicKey
     }
 

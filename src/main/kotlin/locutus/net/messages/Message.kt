@@ -5,6 +5,7 @@ package locutus.net.messages
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kweb.util.random
+import locutus.protocols.ring.contracts.ContractAddress
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
 import locutus.tools.serializers.DurationSerializer
@@ -28,24 +29,29 @@ sealed class Message {
 
     object Meta {
         @Serializable
-        data class RateLimit(val minimumMessageInterval : Duration) : Message(), CanInitiate {
+        data class RateLimit(val minimumMessageInterval: Duration) : Message(), CanInitiate {
             override val isInitiate = true
         }
 
         @Serializable
         class LargeMessage(
             val uid: Int,
-            val totalSize : Bytes,
-            val partNo : Int,
-            val totalParts : Int,
+            val totalSize: Bytes,
+            val partNo: Int,
+            val totalParts: Int,
             val payload: ByteArray,
             val expectNextMessageBy: Duration?,
             override val isInitiate: Boolean
         ) : Message(), CanInitiate
 
         @Serializable
-        class LargeMessageResend(val uid : Int, val missingParts : List<IntRange>, val lastReceivedPartNo : PartNo?) : Message()
+        class LargeMessageResend(val uid: Int, val missingParts: List<IntRange>, val lastReceivedPartNo: PartNo?) : Message()
 
+    }
+
+    object Store {
+        @Serializable
+        class ActiveSubscriptions(val contractAddresses: Set<ContractAddress>)
     }
 
     object Ring {
@@ -57,6 +63,7 @@ sealed class Message {
             sealed class Type {
                 @Serializable
                 data class Initial(val myPublicKey: RSAPublicKey) : Type()
+
                 @Serializable
                 data class Proxy(val joiner: PeerKeyLocation) : Type()
             }
@@ -74,6 +81,7 @@ sealed class Message {
             sealed class Type {
                 @Serializable
                 data class Initial(val yourExternalAddress: Peer, val yourLocation: Location) : Type()
+
                 @Serializable
                 object Proxy : Type() {
                     override fun toString() = "Proxy"
@@ -82,10 +90,11 @@ sealed class Message {
         }
 
         @Serializable
-        data class OpenConnection(val myState : ConnectionState) : Message(), CanInitiate {
+        data class OpenConnection(val myState: ConnectionState) : Message(), CanInitiate {
             override val isInitiate = myState == ConnectionState.Connecting
 
-            @Serializable enum class ConnectionState {
+            @Serializable
+            enum class ConnectionState {
                 Connecting, OCReceived, Connected
             }
         }
@@ -96,12 +105,12 @@ sealed class Message {
 
     object Probe {
         @Serializable
-        data class ProbeRequest(val target : Location, val hopsToLive: Int) : Message()
+        data class ProbeRequest(val target: Location, val hopsToLive: Int) : Message()
 
         @Serializable
-        data class ProbeResponse(val visits : List<Visit>, override val replyTo: MessageId) : Message(), Reply {
+        data class ProbeResponse(val visits: List<Visit>, override val replyTo: MessageId) : Message(), Reply {
             @Serializable
-            data class Visit(val hop : Int, val latency : Long, val location : Location)
+            data class Visit(val hop: Int, val latency: Long, val location: Location)
         }
     }
 

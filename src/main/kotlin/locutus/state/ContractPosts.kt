@@ -26,6 +26,18 @@ class ContractPosts(shoeboxFactory: ShoeboxFactory, myLocation : KVal<Location>)
         }
         return value
     }
+
+    fun deleteLeastRecentlyUsed(i : Int) {
+        lastReadStore
+            .entries
+            .asSequence()
+            .sortedBy { it.value }
+            .take(i)
+            .toCollection(ArrayList()).forEach { (key, value) ->
+            store.remove(key)
+            lastReadStore.remove(key)
+        }
+    }
 }
 
 @Serializable
