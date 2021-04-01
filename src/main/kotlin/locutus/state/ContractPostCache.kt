@@ -1,16 +1,16 @@
 package locutus.state
 
 import kotlinx.serialization.Serializable
+import kweb.shoebox.stores.MapDBStore
 import kweb.state.KVal
+import locutus.protocols.ring.contracts.Bytes
 import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.Post
 import locutus.tools.math.Location
 import locutus.tools.serializers.InstantSerializer
 import java.time.Instant
 
-// TODO: Distance from own location is a *prior* for request frequency
-
-class ContractPosts(shoeboxFactory: ShoeboxFactory, myLocation : KVal<Location>) {
+class ContractPostCache(shoeboxFactory: ShoeboxFactory, val maxSize : Bytes) {
     private val store = shoeboxFactory.create("contract_posts", ContractPost.serializer())
 
     private val lastReadStore = shoeboxFactory.create("contract_posts_last_read", InstantSerializer)
@@ -25,18 +25,6 @@ class ContractPosts(shoeboxFactory: ShoeboxFactory, myLocation : KVal<Location>)
             lastReadStore[base58Sig] = Instant.now()
         }
         return value
-    }
-
-    fun deleteLeastRecentlyUsed(i : Int) {
-        lastReadStore
-            .entries
-            .asSequence()
-            .sortedBy { it.value }
-            .take(i)
-            .toCollection(ArrayList()).forEach { (key, value) ->
-            store.remove(key)
-            lastReadStore.remove(key)
-        }
     }
 }
 

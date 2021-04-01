@@ -1,5 +1,6 @@
 package locutus.protocols.ring.contracts
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.protocols.ring.store.GlobalStore
@@ -20,7 +21,7 @@ import java.security.interfaces.RSAPublicKey
  *               If this is null then this points to the latest post, which will be
  *               updated with each new post.
  */
-@Serializable
+@Serializable @SerialName("mb_v1")
 data class MicroblogContractV1(val pubKey: ECPublicKey, val number: Int? = null) : Contract() {
 
     init {
@@ -52,12 +53,12 @@ class MicroblogPayloadV1(val number: Int, val version: Int, val serializedMessag
 
 @Serializable
 sealed class MicroblogMessage {
-    @Serializable
+    @Serializable @SerialName("text")
     data class Text(val text: String) : MicroblogMessage()
 }
 
 
-@Serializable
+@Serializable @SerialName("mb_post_v1")
 class MicroblogPostV1(val signature: ECSignature, val serializedPayload: ByteArray) : Post() {
     val payload: MicroblogPayloadV1 by lazy { ProtoBuf.decodeFromByteArray(MicroblogPayloadV1.serializer(), serializedPayload) }
 }

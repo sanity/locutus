@@ -1,4 +1,4 @@
-package locutus.client
+package locutus.services
 
 import locutus.net.ConnectionManager
 import locutus.protocols.ring.RingProtocol

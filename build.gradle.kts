@@ -37,6 +37,13 @@ dependencies {
 
     implementation("com.github.kwebio:kweb-core:0.7.33")
 
+    implementation("com.github.kwebio:shoebox") {
+        version {
+            // To avoid having to update kweb every time I update shoebox
+            strictly("0.4.12")
+        }
+    }
+
     implementation("org.mapdb:mapdb:3.0.8")
 
     implementation("io.github.microutils:kotlin-logging:2.0.3")
@@ -49,6 +56,9 @@ dependencies {
     implementation("org.bitcoinj:bitcoinj-core:0.15.10")
 
     implementation("com.github.Backblaze:JavaReedSolomon:0e7f3c8435")
+
+
+  //  implementation ("io.nacular.measured:measured:1.4.21")
 
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
