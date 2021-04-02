@@ -6,7 +6,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kweb.util.random
+import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.ContractAddress
+import locutus.protocols.ring.contracts.Post
 import locutus.tools.crypto.rsa.RSAPublicKeySerializer
 import locutus.tools.math.Location
 import locutus.tools.serializers.DurationSerializer
@@ -52,13 +54,23 @@ sealed class Message {
 
     object Store {
         @Serializable @SerialName("activeSub")
-        class ActiveSubscriptions(val contractAddresses: Set<ContractAddress>) : Message()
+        data class ActiveSubscriptions(val contractAddresses: Set<ContractAddress>) : Message()
 
         @Serializable @SerialName("storeGet")
-        class Get(val contractAddress: ContractAddress, val requestId : Int, val sendContract : Boolean, val sendPost : Boolean, val hopsToLive: Int, val subscribe : Boolean) : Message()
+        data class Get(val contractAddress: ContractAddress, val requestId : Int, val sendContract : Boolean, val sendPost : Boolean, val hopsToLive: Int, val subscribe : Boolean) : Message()
 
         @Serializable @SerialName("storeResponse")
-        class Response(val requestId : Int, ) : Message()
+        data class Response(val requestId : Int, val type : Type) : Message() {
+            @Serializable
+            sealed class Type {
+                @Serializable @SerialName("s")
+                data class Success(val contract : Contract?, val post : Post?) : Type()
+
+                @Serializable @SerialName("f")
+                data class Failure(val reason : String) : Type()
+
+            }
+        }
     }
 
     object Ring {
