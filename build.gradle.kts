@@ -45,21 +45,12 @@ dependencies {
     }
 
     implementation("org.mapdb:mapdb:3.0.8")
-
     implementation("io.github.microutils:kotlin-logging:2.0.3")
     implementation("ch.qos.logback:logback-classic:1.3.0-alpha5")
-
     implementation("org.koin:koin-core:2.1.6")
-
     implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
-
     implementation("org.bitcoinj:bitcoinj-core:0.15.10")
-
     implementation("com.github.Backblaze:JavaReedSolomon:0e7f3c8435")
-
-
-  //  implementation ("io.nacular.measured:measured:1.4.21")
-
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")

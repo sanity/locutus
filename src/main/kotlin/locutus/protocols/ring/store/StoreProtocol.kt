@@ -1,5 +1,9 @@
 package locutus.protocols.ring.store
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.Extractor
 import locutus.net.messages.Message.Store.StoreGet
@@ -7,44 +11,28 @@ import locutus.net.messages.Message.Store.Response
 import locutus.net.messages.Message.Store.Response.Type.Failure
 import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
-import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.ContractAddress
-import locutus.protocols.ring.contracts.Post
-import locutus.state.ContractPost
 import locutus.state.ContractPostCache
 import java.time.Duration
 
-class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, val ring : RingProtocol) {
+private val scope = MainScope()
+
+class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, val ring : RingProtocol, val maxHTL : Int = 10) {
     init {
         cm.listen { from: Peer, storeGetMsg: StoreGet ->
-            val address = storeGetMsg.contractAddress.asBase58Encoded
-            val local = store[address]
-            if (local != null) {
-                cm.send(from, Response(storeGetMsg.requestId, Response.Type.Success(local.contract, local.post)))
-            } else {
-                if (storeGetMsg.hopsToLive <= 0) {
-                    cm.send(from, Response(storeGetMsg.requestId, Failure("HTL expired")))
-                } else {
-                    val forwardPeer = ring.ring.connectionsByDistance(storeGetMsg.contractAddress.asLocation).firstEntry()?.value
-                    if (forwardPeer != null) {
-                        cm.listen(
-                            Extractor<Response, Int>("storeResponse") { this.message.requestId },
-                            storeGetMsg.requestId,
-                            Duration.ofSeconds(30)
-                        ) { _, storeResponse ->
-                            cm.send(from, Response(storeGetMsg.requestId, storeResponse.type))
-                        }
-                        cm.send(forwardPeer.peerKey.peer, storeGetMsg.copy(hopsToLive = storeGetMsg.hopsToLive - 1))
-                    } else {
-                        cm.send(from, Response(storeGetMsg.requestId, Failure("No forwarding peer")))
-                    }
-                }
+            scope.launch {
+                val responseType = get(
+                    storeGetMsg.contractAddress,
+                    storeGetMsg.sendContract,
+                    storeGetMsg.sendPost,
+                    storeGetMsg.hopsToLive - 1
+                )
+                cm.send(from, Response(storeGetMsg.requestId, responseType))
             }
         }
     }
 
-    data class OptContractPost(val contract : Contract?, val post : Post?)
-    fun get(address : ContractAddress, getContract : Boolean, getPost : Boolean) : OptContractPost {
+    suspend fun get(address : ContractAddress, getContract : Boolean, getPost : Boolean, htl : Int = maxHTL, requestId : Int = random.nextInt()) : Response.Type {
         val local = store[address.asBase58Encoded]
         return if (local != null) {
             val contract = if (getContract) {
@@ -53,10 +41,25 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
             val post = if (getPost) {
                 local.post
             } else null
-            OptContractPost(contract, post)
+             Response.Type.Success(contract, post)
+        } else if (htl <= 0) {
+            Response.Type.Failure("HTL expired")
         } else {
-
-            TODO()
+            val deferredResponse = CompletableDeferred<Response.Type>()
+            val forwardPeer = ring.ring.connectionsByDistance(address.asLocation).firstEntry()?.value
+            if (forwardPeer != null) {
+                cm.listen(
+                    Extractor<Response, Int>("storeResponse") { this.message.requestId },
+                    requestId,
+                    Duration.ofSeconds(30)
+                ) { _, storeResponse ->
+                    deferredResponse.complete(storeResponse.type)
+                }
+                cm.send(forwardPeer.peerKey.peer, StoreGet(address, requestId, getContract, getPost, htl, TODO("subscribe?")))
+            } else {
+                Failure("No forwarding peer")
+            }
+            return deferredResponse.await()
         }
     }
 
