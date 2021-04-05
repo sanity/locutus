@@ -57,7 +57,7 @@ sealed class Message {
         data class ActiveSubscriptions(val contractAddresses: Set<ContractAddress>) : Message()
 
         @Serializable @SerialName("storeGet")
-        data class Get(val contractAddress: ContractAddress, val requestId : Int, val sendContract : Boolean, val sendPost : Boolean, val hopsToLive: Int, val subscribe : Boolean) : Message()
+        data class StoreGet(val contractAddress: ContractAddress, val requestId : Int, val sendContract : Boolean, val sendPost : Boolean, val hopsToLive: Int, val subscribe : Boolean) : Message()
 
         @Serializable @SerialName("storeResponse")
         data class Response(val requestId : Int, val type : Type) : Message() {

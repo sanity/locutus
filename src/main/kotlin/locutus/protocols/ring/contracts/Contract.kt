@@ -6,6 +6,8 @@ import locutus.protocols.ring.store.GlobalStore
 
 @Serializable
 sealed class Contract {
+    open val updatable : Boolean get() = false
+
     abstract fun valid(store: GlobalStore, p: Post): Boolean
 
     abstract fun supersedes(old: Post, new: Post): Boolean
