@@ -26,6 +26,10 @@ class ContractPostCache(shoeboxFactory: ShoeboxFactory, val maxSize : Bytes) {
         }
         return value
     }
+
+    operator fun set(base58Sig: String, cp : ContractPost) {
+        store[base58Sig] = cp
+    }
 }
 
 @Serializable

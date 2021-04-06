@@ -9,10 +9,14 @@ import locutus.net.messages.Extractor
 import locutus.net.messages.Message.Store.StoreGet
 import locutus.net.messages.Message.Store.Response
 import locutus.net.messages.Message.Store.Response.Type.Failure
+import locutus.net.messages.Message.Store.Response.Type.Success
 import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
 import locutus.protocols.ring.contracts.ContractAddress
+import locutus.protocols.ring.contracts.Post
+import locutus.state.ContractPost
 import locutus.state.ContractPostCache
+import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 import java.time.Duration
 
 private val scope = MainScope()
@@ -32,35 +36,62 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
         }
     }
 
-    suspend fun get(address : ContractAddress, getContract : Boolean, getPost : Boolean, htl : Int = maxHTL, requestId : Int = random.nextInt()) : Response.Type {
+    suspend fun get(
+        address: ContractAddress,
+        getContract: Boolean,
+        getPost: Boolean,
+        subscribe : Subscription? = null,
+        htl: Int = maxHTL,
+        requestId: Int = random.nextInt()
+    ) : Response.Type {
         val local = store[address.asBase58Encoded]
-        return if (local != null) {
-            val contract = if (getContract) {
-                local.contract
-            } else null
-            val post = if (getPost) {
-                local.post
-            } else null
-             Response.Type.Success(contract, post)
-        } else if (htl <= 0) {
-            Response.Type.Failure("HTL expired")
-        } else {
-            val deferredResponse = CompletableDeferred<Response.Type>()
-            val forwardPeer = ring.ring.connectionsByDistance(address.asLocation).firstEntry()?.value
-            if (forwardPeer != null) {
-                cm.listen(
-                    Extractor<Response, Int>("storeResponse") { this.message.requestId },
-                    requestId,
-                    Duration.ofSeconds(30)
-                ) { _, storeResponse ->
-                    deferredResponse.complete(storeResponse.type)
-                }
-                cm.send(forwardPeer.peerKey.peer, StoreGet(address, requestId, getContract, getPost, htl, TODO("subscribe?")))
-            } else {
-                Failure("No forwarding peer")
+        return when {
+            local != null -> {
+                val contract = if (getContract) {
+                    local.contract
+                } else null
+                val post = if (getPost) {
+                    local.post
+                } else null
+                Success(contract, post)
             }
-            return deferredResponse.await()
+            htl <= 0 -> {
+                Failure("HTL expired")
+            }
+            else -> {
+                val deferredResponse = CompletableDeferred<Response.Type>()
+                val forwardPeer = ring.ring.connectionsByDistance(address.asLocation).firstEntry()?.value
+                if (forwardPeer != null) {
+                    cm.listen(
+                        Extractor<Response, Int>("storeResponse") { this.message.requestId },
+                        requestId,
+                        Duration.ofSeconds(30)
+                    ) { _, storeResponse ->
+                        if (storeResponse.type is Success) {
+                            if (storeResponse.type.contract != null && storeResponse.type.post != null) {
+                                store[address.asBase58Encoded] = ContractPost(storeResponse.type.contract, storeResponse.type.post)
+                            }
+                        }
+                        deferredResponse.complete(storeResponse.type)
+                    }
+                    cm.send(forwardPeer.peerKey.peer, StoreGet(address, requestId, getContract, getPost, htl, TODO("subscribe?")))
+                } else {
+                    Failure("No forwarding peer")
+                }
+                return deferredResponse.await()
+            }
         }
     }
 
+    fun unsubscrbe(subscription : Subscription) {
+        TODO()
+    }
+
+    private val subscriptions = ConcurrentHashMap<ContractAddress, MutableMap<Int, Subscription>>()
+
+    private val subscriptionUidAddresses = ConcurrentHashMap<Int, ContractAddress>()
+}
+
+abstract class Subscription : ((Post) -> Unit) {
+    val uid : Int = random.nextInt()
 }
