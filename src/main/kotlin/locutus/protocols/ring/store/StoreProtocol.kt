@@ -1,15 +1,18 @@
 package locutus.protocols.ring.store
 
+import com.google.common.collect.MapMaker
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import kweb.state.KVal
+import kweb.state.KVar
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.Extractor
 import locutus.net.messages.Message.Store.StoreGet
 import locutus.net.messages.Message.Store.Response
-import locutus.net.messages.Message.Store.Response.Type.Failure
-import locutus.net.messages.Message.Store.Response.Type.Success
+import locutus.net.messages.Message.Store.Response.ResponseType.Failure
+import locutus.net.messages.Message.Store.Response.ResponseType.Success
 import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
 import locutus.protocols.ring.contracts.ContractAddress
@@ -29,9 +32,10 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
                     storeGetMsg.contractAddress,
                     storeGetMsg.sendContract,
                     storeGetMsg.sendPost,
+                    storeGetMsg.subscribe,
                     storeGetMsg.hopsToLive - 1
                 )
-                cm.send(from, Response(storeGetMsg.requestId, responseType))
+                cm.send(from, Response(requestId = storeGetMsg.requestId, responseType = responseType.value))
             }
         }
     }
@@ -40,10 +44,10 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
         address: ContractAddress,
         getContract: Boolean,
         getPost: Boolean,
-        subscribe : Subscription? = null,
+        subscribe : Boolean,
         htl: Int = maxHTL,
         requestId: Int = random.nextInt()
-    ) : Response.Type {
+    ) : KVal<Response.ResponseType> {
         val local = store[address.asBase58Encoded]
         return when {
             local != null -> {
@@ -53,13 +57,13 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
                 val post = if (getPost) {
                     local.post
                 } else null
-                Success(contract, post)
+                KVal(Success(contract = contract, post = post, update = false))
             }
             htl <= 0 -> {
-                Failure("HTL expired")
+                KVal(Failure("HTL expired"))
             }
             else -> {
-                val deferredResponse = CompletableDeferred<Response.Type>()
+                val deferredResponse = CompletableDeferred<Response.ResponseType>()
                 val forwardPeer = ring.ring.connectionsByDistance(address.asLocation).firstEntry()?.value
                 if (forwardPeer != null) {
                     cm.listen(
@@ -67,29 +71,36 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
                         requestId,
                         Duration.ofSeconds(30)
                     ) { _, storeResponse ->
-                        if (storeResponse.type is Success) {
-                            if (storeResponse.type.contract != null && storeResponse.type.post != null) {
-                                store[address.asBase58Encoded] = ContractPost(storeResponse.type.contract, storeResponse.type.post)
+                        if (storeResponse.responseType is Success) {
+                            if (storeResponse.responseType.contract != null && storeResponse.responseType.post != null) {
+                                store[address.asBase58Encoded] = ContractPost(storeResponse.responseType.contract, storeResponse.responseType.post)
                             }
                         }
-                        deferredResponse.complete(storeResponse.type)
+                        deferredResponse.complete(storeResponse.responseType)
                     }
                     cm.send(forwardPeer.peerKey.peer, StoreGet(address, requestId, getContract, getPost, htl, TODO("subscribe?")))
                 } else {
-                    Failure("No forwarding peer")
+                    deferredResponse.complete(Failure("No forwarding peer"))
                 }
-                return deferredResponse.await()
+                val responseKvar = KVar(deferredResponse.await())
+                if (subscribe) {
+                    val id = random.nextInt()
+                    // We use a map with weakvalues to allow KVals which are no-longer used to be closed automatically
+                    subscriptions.computeIfAbsent(address) { MapMaker().weakValues().makeMap() }[id] = responseKvar
+                    responseKvar.onClose {
+                        val addressMap = subscriptions[address]
+                        if (addressMap?.remove(id) != null && addressMap.isEmpty()) {
+                            subscriptions.remove(address)
+                        }
+                    }
+                }
+                responseKvar
             }
         }
     }
 
-    fun unsubscrbe(subscription : Subscription) {
-        TODO()
-    }
+    private val subscriptions = ConcurrentHashMap<ContractAddress, MutableMap<Int, KVar<Response.ResponseType>>>()
 
-    private val subscriptions = ConcurrentHashMap<ContractAddress, MutableMap<Int, Subscription>>()
-
-    private val subscriptionUidAddresses = ConcurrentHashMap<Int, ContractAddress>()
 }
 
 abstract class Subscription : ((Post) -> Unit) {

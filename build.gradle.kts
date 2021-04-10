@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.5.0-M2"
-    kotlin("plugin.serialization") version "1.5.0-M2"
+    kotlin("jvm") version "1.4.32"
+    kotlin("plugin.serialization") version "1.4.32"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.33.0"
@@ -29,21 +29,21 @@ dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.3")
 
     implementation("org.bouncycastle:bcprov-jdk15on:1.66")
     implementation("com.google.guava:guava:30.0-jre")
 
-    implementation("com.github.kwebio:kweb-core:0.7.33")
-
+    implementation("com.github.kwebio:kweb-core:0.8.9")
+/*
     implementation("com.github.kwebio:shoebox") {
         version {
             // To avoid having to update kweb every time I update shoebox
             strictly("0.4.12")
         }
     }
-
+*/
     implementation("org.mapdb:mapdb:3.0.8")
     implementation("io.github.microutils:kotlin-logging:2.0.3")
     implementation("ch.qos.logback:logback-classic:1.3.0-alpha5")

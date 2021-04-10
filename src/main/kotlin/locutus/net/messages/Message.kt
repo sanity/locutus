@@ -60,14 +60,14 @@ sealed class Message {
         data class StoreGet(val contractAddress: ContractAddress, val requestId : Int, val sendContract : Boolean, val sendPost : Boolean, val hopsToLive: Int, val subscribe : Boolean) : Message()
 
         @Serializable @SerialName("storeResponse")
-        data class Response(val requestId : Int, val type : Type) : Message() {
+        data class Response(val requestId : Int, val responseType : ResponseType) : Message() {
             @Serializable
-            sealed class Type {
+            sealed class ResponseType {
                 @Serializable @SerialName("s")
-                data class Success(val contract : Contract?, val post : Post?) : Type()
+                data class Success(val contract : Contract?, val post : Post?, val update : Boolean) : ResponseType()
 
                 @Serializable @SerialName("f")
-                data class Failure(val reason : String) : Type()
+                data class Failure(val reason : String) : ResponseType()
 
             }
         }
