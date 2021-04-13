@@ -27,8 +27,8 @@ configure<SourceSetContainer> {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.0.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.3")
 
@@ -70,11 +70,13 @@ idea {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
         jvmTarget = "1.8"
-        languageVersion = "1.5"
-        apiVersion = "1.5"
+  //      languageVersion = "1.5"
+  //      apiVersion = "1.5"
     }
 }
-
+/*
 tasks.withType(org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile::class) {
  //   kotlinOptions.useIR = true
 }
+
+ */
