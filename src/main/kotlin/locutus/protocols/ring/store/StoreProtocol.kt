@@ -9,6 +9,7 @@ import kweb.state.KVar
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.Extractor
+import locutus.net.messages.Message
 import locutus.net.messages.Message.Store.StoreGet
 import locutus.net.messages.Message.Store.Response
 import locutus.net.messages.Message.Store.Response.ResponseType.Failure
@@ -26,7 +27,7 @@ private val scope = MainScope()
 
 class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, val ring : RingProtocol, val maxHTL : Int = 10) {
     init {
-        cm.listen { from: Peer, storeGetMsg: StoreGet ->
+        cm.listen { from: Peer, storeGetMsg: Message.Store.Request ->
             scope.launch {
                 val responseType = get(
                     storeGetMsg.contractAddress,

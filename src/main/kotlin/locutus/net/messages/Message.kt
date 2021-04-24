@@ -36,41 +36,33 @@ sealed class Message {
             override val isInitiate = true
         }
 
-        @Serializable @SerialName("largeMsg")
-        class LargeMessage(
-            val uid: Int,
-            val totalSize: Bytes,
-            val partNo: Int,
-            val totalParts: Int,
-            val payload: ByteArray,
-            val expectNextMessageBy: Duration?,
-            override val isInitiate: Boolean
-        ) : Message(), CanInitiate
-
-        @Serializable @SerialName("largeMsgResend")
-        class LargeMessageResend(val uid: Int, val missingParts: List<IntRange>, val lastReceivedPartNo: PartNo?) : Message()
-
     }
 
     object Store {
-        @Serializable @SerialName("activeSub")
-        data class ActiveSubscriptions(val contractAddresses: Set<ContractAddress>) : Message()
+        @Serializable @SerialName("storeRequest")
+        data class Request(
+            /**
+             * A list of addresses to request, or subscribe to, or to continue to subscribe to
+             */
+            val requestId : Int,
+            val addresses: Map<ContractAddress, GetOptions>
+            ) : Message() {
 
-        @Serializable @SerialName("storeGet")
-        data class StoreGet(val contractAddress: ContractAddress, val requestId : Int, val sendContract : Boolean, val sendPost : Boolean, val hopsToLive: Int, val subscribe : Boolean) : Message()
+            @Serializable
+            data class GetOptions(
+                val requestContract: Boolean,
+                val requestPost: Boolean,
+                val subscribe: Boolean
+            )
+        }
 
         @Serializable @SerialName("storeResponse")
-        data class Response(val requestId : Int, val responseType : ResponseType) : Message() {
-            @Serializable
-            sealed class ResponseType {
-                @Serializable @SerialName("s")
-                data class Success(val contract : Contract?, val post : Post?, val update : Boolean) : ResponseType()
+        data class Response(val requestId : Int, val contract : Contract?, val post : Post?) : Message() {
 
-                @Serializable @SerialName("f")
-                data class Failure(val reason : String) : ResponseType()
-
-            }
         }
+
+        @Serializable @SerialName("storePut")
+        data class Put(val contract : Contract, val post : Post) : Message()
     }
 
     object Ring {
