@@ -16,6 +16,7 @@ import locutus.net.messages.Message.Store.Response.ResponseType.Failure
 import locutus.net.messages.Message.Store.Response.ResponseType.Success
 import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
+import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.ContractAddress
 import locutus.protocols.ring.contracts.Post
 import locutus.state.ContractPost
@@ -29,6 +30,10 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
     init {
         cm.listen { from: Peer, storeGetMsg: Message.Store.Request ->
             scope.launch {
+                for ((address, options) in storeGetMsg.addresses) {
+                    val response = get(address, options.requestContract, options.requestPost, options.subscribe)
+                }
+
                 val responseType = get(
                     storeGetMsg.contractAddress,
                     storeGetMsg.sendContract,
@@ -41,14 +46,18 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
         }
     }
 
+    sealed class GetResult {
+        data class Success(val contract : Contract?, val post : Post?, val update : Boolean) : GetResult()
+        data class Failure(val reason : String) : GetResult()
+    }
+
     suspend fun get(
         address: ContractAddress,
         getContract: Boolean,
         getPost: Boolean,
         subscribe : Boolean,
-        htl: Int = maxHTL,
         requestId: Int = random.nextInt()
-    ) : KVal<Response.ResponseType> {
+    ) : KVal<GetResult> {
         val local = store[address.asBase58Encoded]
         return when {
             local != null -> {
@@ -58,10 +67,7 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
                 val post = if (getPost) {
                     local.post
                 } else null
-                KVal(Success(contract = contract, post = post, update = false))
-            }
-            htl <= 0 -> {
-                KVal(Failure("HTL expired"))
+                KVal(GetResult.Success(contract = contract, post = post, update = false))
             }
             else -> {
                 val deferredResponse = CompletableDeferred<Response.ResponseType>()
