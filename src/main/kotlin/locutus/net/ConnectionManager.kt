@@ -9,6 +9,7 @@ import locutus.Constants.MAX_UDP_PACKET_SIZE
 import locutus.net.MessageListener.Type.RECEIVED
 import locutus.net.MessageListener.Type.SENT
 import locutus.net.messages.*
+import locutus.protocols.ring.CloseConnection
 import locutus.tools.crypto.AESKey
 import locutus.tools.crypto.merge
 import locutus.tools.crypto.rsa.RSAEncrypted
@@ -41,10 +42,13 @@ class ConnectionManager(
             this(myKey, locutus.net.UDPTransport(port, isOpen))
 
     companion object {
-        val protoBuf = ProtoBuf { encodeDefaults = false }
+        val protoBuf = ProtoBuf {
+            encodeDefaults = false
+            serializersModule = messageModule
+        }
         val pingEvery: Duration = Duration.ofSeconds(30)
         val dropConnectionAfter: Duration = pingEvery.multipliedBy(10)
-        val keepAliveExtractor = Extractor<Message.Keepalive, Unit>("keepAlive") { Unit }
+        val keepAliveExtractor = Extractor<Keepalive, Unit>("keepAlive") { Unit }
     }
 
     private val logger = KotlinLogging.logger {}
@@ -106,7 +110,7 @@ class ConnectionManager(
                     ) {
                         removeConnection(peer, "Time since last keepalive exceeded $dropConnectionAfter")
                     } else {
-                        send(peer, Message.Keepalive())
+                        send(peer, Keepalive())
                     }
                 }
             }
@@ -149,7 +153,7 @@ class ConnectionManager(
     }
 
     fun removeConnection(peer: Peer, reason: String) {
-        send(peer, Message.Ring.CloseConnection(reason))
+        send(peer, CloseConnection(reason))
         connections.remove(peer)
         for (listener in removeConnectionListeners) {
             listener.invoke(peer, reason)

@@ -10,8 +10,6 @@ import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.Extractor
 import locutus.net.messages.Message
-import locutus.net.messages.Message.Store.StoreGet
-import locutus.net.messages.Message.Store.Response
 import locutus.net.messages.Message.Store.Response.ResponseType.Failure
 import locutus.net.messages.Message.Store.Response.ResponseType.Success
 import locutus.net.messages.Peer
@@ -41,7 +39,7 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
                     storeGetMsg.subscribe,
                     storeGetMsg.hopsToLive - 1
                 )
-                cm.send(from, Response(requestId = storeGetMsg.requestId, responseType = responseType.value))
+                cm.send(from, StoreGetResponse(requestId = storeGetMsg.requestId, responseType = responseType.value))
             }
         }
     }
@@ -70,11 +68,11 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
                 KVal(GetResult.Success(contract = contract, post = post, update = false))
             }
             else -> {
-                val deferredResponse = CompletableDeferred<Response.ResponseType>()
+                val deferredResponse = CompletableDeferred<StoreGetResponse.ResponseType>()
                 val forwardPeer = ring.ring.connectionsByDistance(address.asLocation).firstEntry()?.value
                 if (forwardPeer != null) {
                     cm.listen(
-                        Extractor<Response, Int>("storeResponse") { this.message.requestId },
+                        Extractor<StoreGetResponse, Int>("storeResponse") { this.message.requestId },
                         requestId,
                         Duration.ofSeconds(30)
                     ) { _, storeResponse ->
@@ -106,7 +104,7 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
         }
     }
 
-    private val subscriptions = ConcurrentHashMap<ContractAddress, MutableMap<Int, KVar<Response.ResponseType>>>()
+    private val subscriptions = ConcurrentHashMap<ContractAddress, MutableMap<Int, KVar<StoreGetResponse.ResponseType>>>()
 
 }
 
