@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.4.32"
-    kotlin("plugin.serialization") version "1.4.32"
+    kotlin("jvm") version "1.5.0"
+    kotlin("plugin.serialization") version "1.5.0"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.33.0"
@@ -29,8 +29,8 @@ configure<SourceSetContainer> {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.3")
 
