@@ -4,25 +4,33 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
-import locutus.protocols.microblog.v1.MicroblogContractV1
-import locutus.protocols.microblog.v1.MicroblogPostV1
-import locutus.protocols.microblog.v1.MicroblogUpdateV1
+import locutus.protocols.flog.v1.FlogContractV1
+import locutus.protocols.flog.v1.FlogUpdateV1
 import locutus.protocols.ring.store.GlobalStore
+import kotlin.reflect.KClass
 
+@Suppress("UNCHECKED_CAST")
 @Serializable
-abstract class Contract {
+abstract class Contract<P : Post, PU : PostUpdate>(private val postCls : KClass<P>) {
     open val updatable: Boolean get() = false
 
-    abstract fun valid(store: GlobalStore, p: Post): Boolean
+    fun valid(store: GlobalStore, p: Post): Boolean {
+        return ivalid(store, p as P)
+    }
 
-    abstract fun update(old: Post, update: PostUpdate): Post?
+    abstract fun ivalid(store : GlobalStore, p : P) : Boolean
+
+    fun update(old : Post, update : PostUpdate) : Post?
+     = if (!postCls.isInstance(old)) null else iupdate(old as P, update as PU)
+
+    abstract fun iupdate(old: P, update: PU): P?
 
     val sig by lazy { ContractAddress.fromContract(this) }
 }
 
 val contractModule = SerializersModule {
     polymorphic(Contract::class) {
-        subclass(MicroblogContractV1::class)
+        subclass(FlogContractV1::class)
     }
 }
 
@@ -31,7 +39,7 @@ abstract class PostUpdate
 
 val postUpdateModule = SerializersModule {
     polymorphic(PostUpdate::class) {
-        subclass(MicroblogUpdateV1::class)
+        subclass(FlogUpdateV1::class)
     }
 }
 

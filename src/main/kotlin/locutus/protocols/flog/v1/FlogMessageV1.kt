@@ -1,11 +1,11 @@
-package locutus.protocols.microblog.v1
+package locutus.protocols.flog.v1
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-sealed class MicroblogMessageV1 {
+sealed class FlogMessageV1 {
     @Serializable
     @SerialName("text")
-    data class Text(val text: String) : MicroblogMessageV1()
+    data class Text(val text: String) : FlogMessageV1()
 }

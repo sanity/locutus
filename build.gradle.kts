@@ -5,7 +5,7 @@ plugins {
     kotlin("plugin.serialization") version "1.5.0"
     id("idea")
     `java-library`
-    id("com.github.ben-manes.versions") version "0.33.0"
+    id("com.github.ben-manes.versions") version "0.38.0"
 }
 
 group = "locutus"
@@ -31,11 +31,11 @@ dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.2.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.4.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0-RC")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.5.0-RC")
 
-    implementation("org.bouncycastle:bcprov-jdk15on:1.66")
-    implementation("com.google.guava:guava:30.0-jre")
+    implementation("org.bouncycastle:bcprov-jdk15on:1.68")
+    implementation("com.google.guava:guava:30.1.1-jre")
 
     implementation("com.github.kwebio:kweb-core:0.8.9")
 /*
@@ -47,18 +47,18 @@ dependencies {
     }
 */
     implementation("org.mapdb:mapdb:3.0.8")
-    implementation("io.github.microutils:kotlin-logging:2.0.3")
+    implementation("io.github.microutils:kotlin-logging:2.0.6")
     implementation("ch.qos.logback:logback-classic:1.3.0-alpha5")
-    implementation("org.koin:koin-core:2.1.6")
+    implementation("org.koin:koin-core:3.0.1-alpha-5")
     implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
     implementation("org.bitcoinj:bitcoinj-core:0.15.10")
     implementation("com.github.Backblaze:JavaReedSolomon:0e7f3c8435")
 
-    testImplementation("io.kotest:kotest-runner-junit5-jvm:4.3.0")
-    testImplementation("io.kotest:kotest-assertions-core-jvm:4.3.0")
-    testImplementation("io.kotest:kotest-property-jvm:4.3.0")
+    testImplementation("io.kotest:kotest-runner-junit5-jvm:4.5.0")
+    testImplementation("io.kotest:kotest-assertions-core-jvm:4.5.0")
+    testImplementation("io.kotest:kotest-property-jvm:4.5.0")
 
-    testImplementation("org.koin:koin-test:2.1.6")
+    testImplementation("org.koin:koin-test:3.0.1-alpha-5")
 }
 
 idea {
