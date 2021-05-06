@@ -1,4 +1,4 @@
-package locutus.apps
+package locutus.apps.flog
 
 import locutus.net.ConnectionManager
 

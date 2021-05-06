@@ -4,8 +4,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
-import locutus.protocols.flog.v1.FlogContractV1
-import locutus.protocols.flog.v1.FlogUpdateV1
+import locutus.apps.flog.protocol.v1.FlogContractV1
+import locutus.apps.flog.protocol.v1.FlogUpdateV1
 import locutus.protocols.ring.store.GlobalStore
 import kotlin.reflect.KClass
 

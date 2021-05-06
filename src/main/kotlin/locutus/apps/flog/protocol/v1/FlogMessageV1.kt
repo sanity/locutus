@@ -1,4 +1,4 @@
-package locutus.protocols.flog.v1
+package locutus.apps.flog.protocol.v1
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

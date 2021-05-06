@@ -11,7 +11,7 @@ import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
 import java.time.Duration
 
-class BandwidthManagementProtocol(
+/*class BandwidthManagementProtocol(
     val cm: ConnectionManager,
     val bandwidthTracker: BandwidthTracker,
     val ringProtocol: RingProtocol,
@@ -49,4 +49,5 @@ class BandwidthManagementProtocol(
 
 }
 
-private data class BandwidthLimitSample(val bwLimit : Duration, )
+private data class BandwidthLimitSample(val bwLimit : Duration, )*/
+
