@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import locutus.net.messages.Message
 import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.ContractAddress
-import locutus.protocols.ring.contracts.Post
+import locutus.protocols.ring.contracts.Value
 
 @Serializable
 @SerialName("storeRequest")
@@ -27,10 +27,10 @@ data class StoreGet(
 
 @Serializable
 @SerialName("storeResponse")
-data class StoreGetResponse(val requestId : Int, val contract : Contract?, val post : Post?) : Message() {
+data class StoreGetResponse(val requestId : Int, val contract : Contract<*, *>?, val post : Value?) : Message() {
 
 }
 
 @Serializable
 @SerialName("storePut")
-data class StorePut(val contract : Contract, val post : Post) : Message()
+data class StorePut(val contract : Contract<*, *>, val post : Value) : Message()
