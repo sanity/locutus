@@ -8,14 +8,6 @@ import kweb.state.KVar
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.*
-import locutus.net.messages.Message.Ring.CloseConnection
-import locutus.net.messages.Message.Ring.JoinRequest
-import locutus.net.messages.Message.Ring.JoinRequest.Type.Initial
-import locutus.net.messages.Message.Ring.JoinRequest.Type.Proxy
-import locutus.net.messages.Message.Ring.JoinResponse
-import locutus.net.messages.Message.Ring.OpenConnection
-import locutus.net.messages.Message.Ring.OpenConnection.ConnectionState
-import locutus.net.messages.Message.Ring.OpenConnection.ConnectionState.*
 import locutus.tools.math.Location
 import mu.KotlinLogging
 import mu.withLoggingContext
@@ -98,11 +90,11 @@ class RingProtocol(
                 val peerKeyLocation: PeerKeyLocation
                 logger.debug { "JoinRequest type is ${joinRequest.type::class.simpleName}" }
                 val replyType = when (val type = joinRequest.type) {
-                    is Initial -> {
+                    is JoinRequest.Type.Initial -> {
                         peerKeyLocation = PeerKeyLocation(sender, type.myPublicKey, Location(random.nextDouble()))
                         JoinResponse.Type.Initial(peerKeyLocation.peerKey.peer, peerKeyLocation.location)
                     }
-                    is Proxy -> {
+                    is JoinRequest.Type.Proxy -> {
                         peerKeyLocation = type.joiner
                         JoinResponse.Type.Proxy
                     }
@@ -154,7 +146,7 @@ class RingProtocol(
                     if (forwardTo != null) {
                         val forwarded =
                             JoinRequest(
-                                type = Proxy(peerKeyLocation),
+                                type = JoinRequest.Type.Proxy(peerKeyLocation),
                                 hopsToLive = min(joinRequest.hopsToLive, maxHopsToLive) - 1
                             )
 
@@ -191,7 +183,7 @@ class RingProtocol(
                 for (gateway in gateways.toList().shuffled()) {
                     logger.info { "Joining Ring via $gateway" }
                     connectionManager.addConnection(gateway, true)
-                    val joinRequest = JoinRequest(Initial(connectionManager.myKey.public), maxHopsToLive)
+                    val joinRequest = JoinRequest(JoinRequest.Type.Initial(connectionManager.myKey.public), maxHopsToLive)
                     logger.debug { "Sending JoinRequest(id=${joinRequest.id}) to ${gateway.peer}" }
                     connectionManager.send<JoinResponse>(
                         to = gateway.peer,

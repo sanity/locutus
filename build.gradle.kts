@@ -49,7 +49,7 @@ dependencies {
     implementation("org.mapdb:mapdb:3.0.8")
     implementation("io.github.microutils:kotlin-logging:2.0.6")
     implementation("ch.qos.logback:logback-classic:1.3.0-alpha5")
-    implementation("org.koin:koin-core:3.0.1-alpha-5")
+    implementation("io.insert-koin:koin-core-jvm:3.0.1")
     implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
     implementation("org.bitcoinj:bitcoinj-core:0.15.10")
     implementation("com.github.Backblaze:JavaReedSolomon:0e7f3c8435")
@@ -58,7 +58,6 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.5.0")
     testImplementation("io.kotest:kotest-property-jvm:4.5.0")
 
-    testImplementation("org.koin:koin-test:3.0.1-alpha-5")
 }
 
 idea {

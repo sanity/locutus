@@ -4,7 +4,7 @@ import kotlinx.serialization.KSerializer
 import kweb.shoebox.Shoebox
 import kweb.shoebox.stores.MapDBStore
 import kweb.shoebox.stores.MemoryStore
-import locutus.protocols.ring.contracts.Bytes
+import locutus.tools.Bytes
 import mu.KotlinLogging
 import org.mapdb.DB
 
