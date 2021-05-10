@@ -11,19 +11,20 @@ import kotlin.reflect.KClass
 
 @Suppress("UNCHECKED_CAST")
 @Serializable
-abstract class Contract<P : Post, PU : PostUpdate>(private val postCls : KClass<P>) {
+
+abstract class Contract<V : Value, VU : ValueUpdate>(private val valueCls : KClass<V>) {
     open val updatable: Boolean get() = false
 
-    fun valid(store: GlobalStore, p: Post): Boolean {
-        return ivalid(store, p as P)
+    fun valid(store: GlobalStore, p: Value): Boolean {
+        return ivalid(store, p as V)
     }
 
-    abstract fun ivalid(store : GlobalStore, p : P) : Boolean
+    abstract fun ivalid(store : GlobalStore, p : V) : Boolean
 
-    fun update(old : Post, update : PostUpdate) : Post?
-     = if (!postCls.isInstance(old)) null else iupdate(old as P, update as PU)
+    fun update(old : Value, update : ValueUpdate) : Value?
+     = if (!valueCls.isInstance(old)) null else iupdate(old as V, update as VU)
 
-    abstract fun iupdate(old: P, update: PU): P?
+    abstract fun iupdate(old: V, update: VU): V?
 
     val sig by lazy { ContractAddress.fromContract(this) }
 }
@@ -35,16 +36,16 @@ val contractModule = SerializersModule {
 }
 
 @Serializable
-abstract class PostUpdate
+abstract class ValueUpdate
 
 val postUpdateModule = SerializersModule {
-    polymorphic(PostUpdate::class) {
+    polymorphic(ValueUpdate::class) {
         subclass(FlogUpdateV1::class)
     }
 }
 
 @Serializable
-abstract class Post
+abstract class Value
 
 
 

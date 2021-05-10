@@ -1,12 +1,9 @@
 package locutus.state
 
 import kotlinx.serialization.Serializable
-import kweb.shoebox.stores.MapDBStore
-import kweb.state.KVal
 import locutus.protocols.ring.contracts.Bytes
 import locutus.protocols.ring.contracts.Contract
-import locutus.protocols.ring.contracts.Post
-import locutus.tools.math.Location
+import locutus.protocols.ring.contracts.Value
 import locutus.tools.serializers.InstantSerializer
 import java.time.Instant
 
@@ -33,5 +30,5 @@ class ContractPostCache(shoeboxFactory: ShoeboxFactory, val maxSize : Bytes) {
 }
 
 @Serializable
-data class ContractPost(val contract : Contract, val post : Post) {
+data class ContractPost(val contract : Contract, val post : Value) {
 }

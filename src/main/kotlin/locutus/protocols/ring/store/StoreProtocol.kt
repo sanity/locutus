@@ -16,7 +16,7 @@ import locutus.net.messages.Peer
 import locutus.protocols.ring.RingProtocol
 import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.ContractAddress
-import locutus.protocols.ring.contracts.Post
+import locutus.protocols.ring.contracts.Value
 import locutus.state.ContractPost
 import locutus.state.ContractPostCache
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
@@ -45,7 +45,7 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
     }
 
     sealed class GetResult {
-        data class Success(val contract : Contract?, val post : Post?, val update : Boolean) : GetResult()
+        data class Success(val contract : Contract?, val post : Value?, val update : Boolean) : GetResult()
         data class Failure(val reason : String) : GetResult()
     }
 
@@ -108,6 +108,6 @@ class StoreProtocol(val store : ContractPostCache, val cm: ConnectionManager, va
 
 }
 
-abstract class Subscription : ((Post) -> Unit) {
+abstract class Subscription : ((Value) -> Unit) {
     val uid : Int = random.nextInt()
 }
