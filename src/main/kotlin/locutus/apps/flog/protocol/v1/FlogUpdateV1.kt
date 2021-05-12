@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 import locutus.protocols.ring.contracts.ValueUpdate
 
 @Serializable
-data class FlogUpdateV1(val updated : MicroblogPostV1) : ValueUpdate() {
+data class FlogUpdateV1(val updated : FlogPostV1) : ValueUpdate() {
 
 }

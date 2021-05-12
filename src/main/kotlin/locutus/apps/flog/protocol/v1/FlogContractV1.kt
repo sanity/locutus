@@ -3,6 +3,8 @@ package locutus.apps.flog.protocol.v1
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import locutus.protocols.ring.contracts.Contract
+import locutus.protocols.ring.contracts.Value
+import locutus.protocols.ring.contracts.ValueUpdate
 import locutus.protocols.ring.store.GlobalStore
 import locutus.tools.crypto.ec.verify
 import java.security.interfaces.ECPublicKey
@@ -25,21 +27,32 @@ An updatable value?
  */
 @Serializable
 @SerialName("mb_v1")
-data class FlogContractV1(val pubKey: ECPublicKey, val number: Int? = null) : Contract<MicroblogPostV1, FlogUpdateV1>(MicroblogPostV1::class) {
+data class FlogContractV1(val pubKey: ECPublicKey, val number: Int? = null) : Contract() {
 
     init {
         require(number == null || number >= 0)
     }
 
-    override fun ivalid(retriever: GlobalStore, post: MicroblogPostV1): Boolean {
-        return (number == null || number == post.payload.number) && pubKey.verify(post.signature, post.serializedPayload)
+    override fun valid(retriever: GlobalStore, post: Value): Boolean {
+        return if (post is FlogPostV1) {
+            (number == null || number == post.payload.number) && pubKey.verify(post.signature, post.serializedPayload)
+        } else {
+            false
+        }
     }
 
-    override fun iupdate(old: MicroblogPostV1, update: FlogUpdateV1): MicroblogPostV1? {
-        return if (update.updated.payload.version > old.payload.version) {
-            update.updated
-        } else {
-            null
+    override fun update(old: Value, update: ValueUpdate): FlogPostV1? {
+        return when {
+            old is FlogPostV1 && update is FlogUpdateV1 -> {
+                return if (update.updated.payload.version > old.payload.version) {
+                    update.updated
+                } else {
+                    null
+                }
+            }
+            else -> {
+                null
+            }
         }
     }
 }
