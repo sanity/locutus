@@ -25,15 +25,25 @@ class MessageRouter {
             timeout: Duration?,
             noinline block: (from : Peer, message : MType) -> Unit
     ) {
-        logger.info("Add listener for ${MType::class.simpleName}")
+        listen(MType::class, for_, key, timeout, block)
+    }
+
+    fun <KeyType : Any, MType : Message> listen(
+        msgKClass: KClass<MType>,
+        for_: Extractor<MType, KeyType>,
+        key: KeyType,
+        timeout: Duration?,
+        block: (from: Peer, message: MType) -> Unit
+    ) {
+        logger.info("Add listener for ${msgKClass.simpleName}")
         listeners
-                .computeIfAbsent(MType::class) { ConcurrentHashMap() }
-                .computeIfAbsent(for_.label) { ConcurrentHashMap() }[key] = block as ((from: Peer, message: Message) -> Unit)
+            .computeIfAbsent(msgKClass) { ConcurrentHashMap() }
+            .computeIfAbsent(for_.label) { ConcurrentHashMap() }[key] = block as ((from: Peer, message: Message) -> Unit)
         extractors.putIfAbsent(for_.label, for_ as Extractor<Message, Any>)
         if (timeout != NEVER) {
             scope.launch(Dispatchers.IO) {
                 delay(timeout)
-                val extractorMap = listeners[MType::class]
+                val extractorMap = listeners[msgKClass]
                 if (extractorMap != null) {
                     val receiverMap = extractorMap[for_.label]
                     if (receiverMap != null) {

@@ -8,6 +8,8 @@ import kweb.state.KVar
 import kweb.util.random
 import locutus.net.ConnectionManager
 import locutus.net.messages.*
+import locutus.protocols.ring.OpenConnection.ConnectionState
+import locutus.protocols.ring.OpenConnection.ConnectionState.*
 import locutus.tools.math.Location
 import mu.KotlinLogging
 import mu.withLoggingContext

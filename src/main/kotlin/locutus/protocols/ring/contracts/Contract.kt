@@ -7,8 +7,9 @@ import kotlinx.serialization.modules.subclass
 import kotlinx.serialization.protobuf.ProtoBuf
 import locutus.apps.flog.protocol.v1.FlogContractV1
 import locutus.apps.flog.protocol.v1.FlogUpdateV1
+import locutus.apps.signed.v1.SignedContractV1
+import locutus.apps.signed.v1.SignedValueUpdateV1
 import locutus.protocols.ring.store.GlobalStore
-import kotlin.reflect.KClass
 
 @Suppress("UNCHECKED_CAST")
 @Serializable
@@ -16,9 +17,11 @@ import kotlin.reflect.KClass
 abstract class Contract {
     open val updatable: Boolean get() = false
 
-    abstract fun valid(store: GlobalStore, p: Value): Boolean
+    abstract fun valid(store: GlobalStore, p: Value): Result<Unit>
 
     abstract fun update(old : Value, update : ValueUpdate) : Value?
+
+    open fun updateRelevantTo(update : ValueUpdate) : Set<Contract> = emptySet()
 
     val sig by lazy { ContractAddress.fromContract(this) }
 }
@@ -26,6 +29,11 @@ abstract class Contract {
 val contractModule = SerializersModule {
     polymorphic(Contract::class) {
         subclass(FlogContractV1::class)
+        subclass(SignedContractV1::class)
+    }
+
+    polymorphic(ValueUpdate::class) {
+        subclass(SignedValueUpdateV1::class)
     }
 }
 

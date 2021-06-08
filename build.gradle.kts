@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.5.0"
-    kotlin("plugin.serialization") version "1.5.0"
+    kotlin("jvm") version "1.5.10"
+    kotlin("plugin.serialization") version "1.5.10"
     id("idea")
     `java-library`
     id("com.github.ben-manes.versions") version "0.38.0"
@@ -37,7 +37,7 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk15on:1.68")
     implementation("com.google.guava:guava:30.1.1-jre")
 
-    implementation("com.github.kwebio:kweb-core:0.8.9")
+    implementation("com.github.kwebio:kweb-core:0.9.0")
 /*
     implementation("com.github.kwebio:shoebox") {
         version {
@@ -53,6 +53,7 @@ dependencies {
     implementation("com.github.sanity:pairAdjacentViolators:1.4.16")
     implementation("org.bitcoinj:bitcoinj-core:0.15.10")
     implementation("com.github.Backblaze:JavaReedSolomon:0e7f3c8435")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.2.0")
 
     testImplementation("io.kotest:kotest-runner-junit5-jvm:4.5.0")
     testImplementation("io.kotest:kotest-assertions-core-jvm:4.5.0")

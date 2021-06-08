@@ -48,7 +48,7 @@ class ConnectionManager(
         }
         val pingEvery: Duration = Duration.ofSeconds(30)
         val dropConnectionAfter: Duration = pingEvery.multipliedBy(10)
-        val keepAliveExtractor = Extractor<Keepalive, Unit>("keepAlive") { Unit }
+        val keepAliveExtractor = Extractor<Keepalive, Unit>("keepAlive") { _, _ -> Unit }
     }
 
     private val logger = KotlinLogging.logger {}
@@ -219,10 +219,10 @@ class ConnectionManager(
         val responseReceived = AtomicBoolean(false)
         val replyExtractor =
             replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
-        router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, { xSender, xMessage ->
+        router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor) { xSender, xMessage ->
             responseReceived.set(true)
             block.invoke(xSender, xMessage)
-        })
+        }
         send(to, message)
         scope.launch(Dispatchers.IO) {
             val startTime = Instant.now()
@@ -239,7 +239,15 @@ class ConnectionManager(
 
     inline fun <reified MType : Message> listen(noinline block: (from : Peer, message : MType) -> Unit) {
         listen(
-            for_ = Extractor(MType::class.simpleName ?: error("Message class has no simpleName")) { },
+            MType::class,
+            block
+        )
+    }
+
+    fun <MType : Message> listen(msgKClass: KClass<MType>, block: (from : Peer, message : MType) -> Unit) {
+        listen(
+            msgKClass,
+            extractor = Extractor(msgKClass.simpleName ?: error("Message class has no simpleName")) { _, _ -> },
             key = Unit,
             NEVER,
             block
@@ -250,12 +258,25 @@ class ConnectionManager(
      * Listen for incoming messages, see [MessageRouter.listen]
      */
     inline fun <reified MType : Message, KeyType : Any> listen(
-        for_: Extractor<MType, KeyType>,
+        extractor: Extractor<MType, KeyType>,
         key: KeyType,
         timeout: Duration?,
         noinline block: (from : Peer, message : MType) -> Unit
     ) {
-        router.listen(for_, key, timeout, block)
+        this.listen(MType::class, extractor, key, timeout, block)
+    }
+
+    /**
+     * Listen for incoming messages, see [MessageRouter.listen]
+     */
+    fun <MType : Message, KeyType : Any> listen(
+        msgKClass: KClass<MType>,
+        extractor : Extractor<MType, KeyType>,
+        key: KeyType,
+        timeout: Duration?,
+        block: (from : Peer, message : MType) -> Unit
+    ) {
+        router.listen(msgKClass, extractor, key, timeout, block)
     }
 
     // TODO: This should be an expiring cache

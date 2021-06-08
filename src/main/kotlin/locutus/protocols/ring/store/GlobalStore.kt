@@ -3,25 +3,18 @@ package locutus.protocols.ring.store
 import locutus.protocols.ring.contracts.Contract
 import locutus.protocols.ring.contracts.ContractAddress
 import locutus.protocols.ring.contracts.Value
-import locutus.state.ContractPost
-import locutus.state.ContractPostCache
+import locutus.protocols.ring.contracts.ValueUpdate
 
-class GlobalStore(val storeProtocol: StoreProtocol, val cpc : ContractPostCache) {
-    fun put(contract : Contract, post : Value) {
-        require(contract.valid(this, post))
-        cpc += ContractPost(contract, post)
+class GlobalStore(val storeProtocol: StoreProtocol) {
+    fun update(contract : Contract, value : Value, post : ValueUpdate) {
         TODO()
     }
 
-    suspend fun get(contract : Contract) : Value? {
+    suspend fun get(address : ContractAddress) : Value? {
         TODO()
     }
 
-    suspend fun get(address : ContractAddress) : ContractPost? {
-        TODO()
-    }
-
-    suspend fun subscribe(address: ContractAddress, receiver : () -> Value) {
+    suspend fun subscribe(address: ContractAddress, receiver : (Value) -> Unit) {
         TODO()
     }
 }
