@@ -241,7 +241,7 @@ class RingProtocol(
             }
 
             connectionManager.listen(
-                Extractor<OpenConnection, Peer>("openConnection") { sender },
+                Extractor<OpenConnection, Peer>("openConnection") { sender, _ -> sender },
                 newPeer.peerKey.peer,
                 Duration.ofSeconds(30)
             ) { _, openConnectionMsg ->

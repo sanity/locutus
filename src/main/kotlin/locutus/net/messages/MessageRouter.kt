@@ -67,7 +67,7 @@ class MessageRouter {
         for ((extractorLabel, keys) in classListeners.entries) {
             val extractor = extractors[extractorLabel]
             requireNotNull(extractor) { "No extractor found for label $extractorLabel" }
-            val receiver = keys[extractor.extractor.invoke(SenderMessage(sender, message))]
+            val receiver = keys[extractor.extractor.invoke(sender, message)]
             receiver?.let { receiver ->
                 messageHandled.set(true)
                 receiver.invoke(sender, message)
