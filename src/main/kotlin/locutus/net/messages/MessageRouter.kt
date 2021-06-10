@@ -9,6 +9,7 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.reflect.KClass
+import kotlin.reflect.KProperty1
 
 @PublishedApi internal val logger = KotlinLogging.logger {}
 
@@ -30,7 +31,7 @@ class MessageRouter {
 
     fun <KeyType : Any, MType : Message> listen(
         msgKClass: KClass<MType>,
-        for_: Extractor<MType, KeyType>,
+        property: KProperty1<MType, locutus.net.messages.KeyType>,
         key: KeyType,
         timeout: Duration?,
         block: (from: Peer, message: MType) -> Unit
