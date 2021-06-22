@@ -13,7 +13,7 @@ data class ContractAddress(val hash: ByteArray) {
 
     companion object {
         fun fromContract(contract: Contract)
-        = ContractAddress(ProtoBuf.encodeToByteArray(Contract.serializer(), contract).hash())
+        = ContractAddress(contractProtoBuf.encodeToByteArray(Contract.serializer(), contract).hash())
 
         fun fromBase58Encoded(encoded: String): ContractAddress {
             val decoded = Base58.decodeChecked(encoded)

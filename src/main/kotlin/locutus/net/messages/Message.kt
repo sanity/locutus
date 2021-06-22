@@ -56,6 +56,7 @@ val messageModule = SerializersModule {
         // Misc
         subclass(Keepalive::class)
         subclass(RateLimit::class)
+        subclass(Multipart::class)
 
         // Testing
         subclass(FooMessage::class)

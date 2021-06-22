@@ -1,10 +1,12 @@
 package locutus.net
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
 import kotlinx.serialization.protobuf.ProtoBuf
+import kweb.util.random
 import locutus.Constants.MAX_UDP_PACKET_SIZE
 import locutus.net.MessageListener.Type.RECEIVED
 import locutus.net.MessageListener.Type.SENT
@@ -29,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.reflect.KClass
 
+typealias MessageReceiver = List< (from : Peer, message : Message) -> Unit>
 
 /**
  * Responsible for securely transmitting [Message]s between [Peer]s.
@@ -37,7 +40,6 @@ class ConnectionManager(
     val myKey: RSAKeyPair,
     val transport: Transport,
 ) {
-
     constructor(port: Int, isOpen: Boolean, myKey: RSAKeyPair) :
             this(myKey, locutus.net.UDPTransport(port, isOpen))
 
@@ -48,7 +50,6 @@ class ConnectionManager(
         }
         val pingEvery: Duration = Duration.ofSeconds(30)
         val dropConnectionAfter: Duration = pingEvery.multipliedBy(10)
-        val keepAliveExtractor = Extractor<Keepalive, Unit>("keepAlive") { Unit }
     }
 
     private val logger = KotlinLogging.logger {}
@@ -75,10 +76,6 @@ class ConnectionManager(
         }
     }
 
-    @PublishedApi
-    internal val router = MessageRouter()
-
-
     init {
         scope.launch(Dispatchers.IO) {
             for ((sender, packet) in transport.recepient) {
@@ -90,7 +87,7 @@ class ConnectionManager(
     }
 
     private fun listenForKeepalives() {
-        listen(keepAliveExtractor, Unit, NEVER) { sender, _ ->
+        listen<Keepalive> { sender, _ ->
             val connection = connections[sender]
             if (connection != null) {
                 connection.lastKeepaliveReceived = Instant.now()
@@ -195,70 +192,62 @@ class ConnectionManager(
         }
     }
 
-    @PublishedApi
-    internal val replyExtractorMap = ConcurrentHashMap<KClass<*>, ReplyExtractor<*>>()
+    class MessageTypeListener(
+        val global: ConcurrentHashMap<Int, (from : Peer, message : Message) -> Unit> = ConcurrentHashMap(),
+        val replies: ConcurrentHashMap<MessageId, ConcurrentHashMap<Int, (from : Peer, message : Message) -> Unit>> = ConcurrentHashMap()
+    )
 
-    /**
-     * Send a message and listen for a response, this ensures that the response listener
-     * is registered before the message is sent to avoid possible race condition.
-     *
-     * Will resend the message every [retryDelay] up to [retries] times until a resposne is received.
-     * This shouldn't be a problem as [ConnectionManager] will automatically disregard duplicate messages (determined
-     * by their [MessageId].
-     */
-    inline fun <reified ReplyType : Message> send(
-        to: Peer,
-        message: Message,
-        retries: Int = 5,
-        retryDelay: Duration = Duration.ofMillis(200),
-        listenFor: Duration = Duration.ofSeconds(60),
-        noinline block: (from : Peer, message : ReplyType) -> Unit
-    ) {
-        assert(Reply::class.java.isAssignableFrom(ReplyType::class.java)) { "ReplyType must implement Reply interface" }
+    private val listeners = ConcurrentHashMap<KClass<out Message>, MessageTypeListener>()
 
-        val responseReceived = AtomicBoolean(false)
-        val replyExtractor =
-            replyExtractorMap.computeIfAbsent(ReplyType::class) { ReplyExtractor<ReplyType>("reply-extractor-${ReplyType::class.qualifiedName}") }
-        router.listen(replyExtractor as ReplyExtractor<ReplyType>, PeerId(to, message.id), listenFor, { xSender, xMessage ->
-            responseReceived.set(true)
-            block.invoke(xSender, xMessage)
-        })
-        send(to, message)
-        scope.launch(Dispatchers.IO) {
-            val startTime = Instant.now()
-            for (retryNo in 1..retries) {
-                delay(retryDelay)
-                if (Duration.between(startTime, Instant.now()) > listenFor) {
-                    break
-                }
-                if (responseReceived.get()) break
-                send(to, message)
-            }
-        }
+    interface ListenHandler {
+        fun cancel()
     }
 
-    inline fun <reified MType : Message> listen(noinline block: (from : Peer, message : MType) -> Unit) {
-        listen(
-            for_ = Extractor(MType::class.simpleName ?: error("Message class has no simpleName")) { },
-            key = Unit,
-            NEVER,
+    inline fun <reified MType : Message> listen(noinline block: (from : Peer, message : MType) -> Unit) : ListenHandler {
+        return listen(
+            MType::class,
             block
         )
     }
 
-    /**
-     * Listen for incoming messages, see [MessageRouter.listen]
-     */
-    inline fun <reified MType : Message, KeyType : Any> listen(
-        for_: Extractor<MType, KeyType>,
-        key: KeyType,
-        timeout: Duration?,
-        noinline block: (from : Peer, message : MType) -> Unit
-    ) {
-        router.listen(for_, key, timeout, block)
+    @Suppress("UNCHECKED_CAST")
+    fun <MType : Message> listen(msgKClass: KClass<MType>, block: (from : Peer, message : MType) -> Unit) : ListenHandler {
+        val mtListener = listeners.computeIfAbsent(msgKClass) { MessageTypeListener() }
+        val handleId = random.nextInt()
+        mtListener.global[handleId] = block as (Peer, Message) -> Unit
+        return object : ListenHandler {
+            override fun cancel() {
+                mtListener.global.remove(handleId)
+            }
+
+        }
     }
 
-    // TODO: This should be an expiring cache
+    inline fun <reified MType : Reply> listen(messageId: MessageId, noinline block : (from : Peer, message : MType) -> Unit) : ListenHandler {
+        return listen(MType::class, messageId, block)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun <MType : Reply> listen(msgKClass : KClass<MType>, messageId: MessageId, block : (from : Peer, message : MType) -> Unit)  : ListenHandler {
+        val mtListener = listeners.computeIfAbsent(msgKClass as KClass<out Message>) { MessageTypeListener() }
+        val handleId = random.nextInt()
+        mtListener.replies.computeIfAbsent(messageId) { ConcurrentHashMap() }[handleId] = block as (from : Peer, message : Message) -> Unit
+        return object : ListenHandler {
+            override fun cancel() {
+                val concurrentHashMap = mtListener.replies[messageId]
+                if (concurrentHashMap != null) {
+                    concurrentHashMap.remove(handleId)
+                    if (concurrentHashMap.isEmpty()) {
+                        mtListener.replies.remove(messageId)
+                    }
+                }
+
+            }
+        }
+    }
+
+
+        // TODO: This should be an expiring cache
     private val msgIds = ConcurrentSkipListSet<MessageId>()
 
     private fun handleReceivedPacket(sender: Peer, rawPacket: ByteArray) {
@@ -348,15 +337,6 @@ class ConnectionManager(
         }
     }
 
-    private val listeners = ConcurrentHashMap<Long, MessageListener>()
-    private val listenerHandlerGen = AtomicLong(0)
-    fun addListener(messageListener : MessageListener) : Long {
-        val handle = listenerHandlerGen.getAndIncrement()
-        listeners[handle] = messageListener
-        return handle
-    }
-
-    fun removeListener(handle : Long) = listeners.remove(handle)
 }
 
 fun interface MessageListener {
